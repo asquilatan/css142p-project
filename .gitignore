@@ -1,0 +1,24 @@
+# Ignore markdown documentation files except README.md
+*.md
+!README.md
+
+# Media & temporary references
+*.jpg
+*.jpeg
+*.png
+!assets/*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.venv
+venv/
+env/
+.pytest_cache/
+
+# OS / IDE
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
