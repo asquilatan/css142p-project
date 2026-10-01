@@ -107,8 +107,8 @@ class GraphsView:
         self.window = pygame.Window(title="Telemetry & Waveform Analytics", size=(self.width, self.height))
         self.window.hide()
 
-        # Cache close button
-        self.close_btn_rect = pygame.Rect(self.width - 110, 16, 90, 32)
+        # Cache close button (generous clickable target)
+        self.close_btn_rect = pygame.Rect(self.width - 124, 14, 100, 34)
 
         # Vector downsampling cache to guarantee 60 FPS without re-computing every frame
         self._cached_pts: Dict[str, List[Tuple[int, int]]] = {}
@@ -137,17 +137,29 @@ class GraphsView:
         if not self.is_visible:
             return False
 
-        if event.type == pygame.WINDOWCLOSE:
-            if getattr(event, "window", None) == self.window:
-                self.set_visible(False)
-                return True
+        event_win = getattr(event, "window", None)
+        is_my_window = (event_win == self.window) or (getattr(event_win, "id", None) == self.window.id)
 
-        if getattr(event, "window", None) == self.window:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                mouse_pos = event.pos
+        # 1. OS Titlebar Close Button ('X')
+        if event.type == pygame.WINDOWCLOSE and is_my_window:
+            self.set_visible(False)
+            return True
+
+        # 2. Events targeted at this window
+        if is_my_window:
+            # Mouse click on "✕ Close" button inside window (handle both down and up)
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP) and getattr(event, "button", None) == 1:
+                mouse_pos = getattr(event, "pos", (0, 0))
                 if self.close_btn_rect.collidepoint(mouse_pos):
                     self.set_visible(False)
                     return True
+
+            # Keyboard shortcut when secondary window has focus
+            elif event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_x, pygame.K_ESCAPE, pygame.K_g):
+                    self.set_visible(False)
+                    return True
+
             return True
 
         return False
@@ -179,12 +191,10 @@ class GraphsView:
         surface.blit(status_surf, (24, 46))
 
         # Close Button
-        mouse_pos = pygame.mouse.get_pos()
-        close_hover = self.close_btn_rect.collidepoint(mouse_pos)
-        close_bg = (60, 35, 35) if close_hover else (38, 40, 46)
+        close_bg = (55, 36, 38)
         pygame.draw.rect(surface, close_bg, self.close_btn_rect, border_radius=4)
-        pygame.draw.rect(surface, (70, 72, 82), self.close_btn_rect, width=1, border_radius=4)
-        close_txt = self.fonts.get("small_bold").render("✕ Close", True, (220, 225, 235))
+        pygame.draw.rect(surface, (90, 60, 64), self.close_btn_rect, width=1, border_radius=4)
+        close_txt = self.fonts.get("small_bold").render("✕ Close (X)", True, (240, 240, 245))
         surface.blit(close_txt, close_txt.get_rect(center=self.close_btn_rect.center))
 
         # ---------------------------------------------------------------------
