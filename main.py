@@ -198,8 +198,8 @@ def main():
         dt = current_real_time - last_frame_time
         last_frame_time = current_real_time
 
-        # Clamp dt to 33ms (~30 FPS minimum step) to prevent delta-time lag death spirals
-        dt = min(dt, 0.033)
+        # Clamp dt to 50ms (prevents lag death spirals while maintaining accurate real-time simulation pace)
+        dt = min(dt, 0.05)
 
         # ---------------------------------------------------------------------
         # 1. Event Handling
