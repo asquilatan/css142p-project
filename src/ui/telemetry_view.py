@@ -12,20 +12,27 @@ from src.ui.layout import Layout
 from src.ui.widgets import Button
 
 
+from src.ui.assets_manager import AssetsManager
+
+
 class TelemetryView:
-    def __init__(self, layout: Layout, fonts: dict, on_toggle_graphs: Optional[Callable] = None):
+    def __init__(self, layout: Layout, fonts: dict, on_toggle_graphs: Optional[Callable] = None,
+                 assets: Optional[AssetsManager] = None):
         self.layout = layout
         self.fonts = fonts
+        self.assets = assets
         self.show_graphs_active = False
 
+        graphs_icon = assets.get_icon("icon_graphs") if assets else None
         self.graphs_btn = Button(
             pygame.Rect(0, 0, 160, 30),
-            text="[Show Graphs]",
+            text="Graphs",
             font=fonts["normal"],
             callback=self._toggle_graphs,
             is_toggle=True,
             active_bg=(138, 180, 248),
-            active_text=(20, 20, 25)
+            active_text=(20, 20, 25),
+            icon=graphs_icon
         )
         self.on_toggle_graphs = on_toggle_graphs
 
