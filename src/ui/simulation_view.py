@@ -21,6 +21,7 @@ class SimulationView:
         self.fonts = fonts
 
         self.active_packets: List[PacketAnimation] = []
+        self.max_active_packets = 10  # Hard cap on in-flight animated packets
         self.next_anim_id = 1
         self.last_anim_spawn_time = 0.0
 
@@ -115,7 +116,8 @@ class SimulationView:
 
         return False
 
-    def update_and_draw(self, surface: pygame.Surface, sim: SimulationEngine, current_real_time: float):
+    def update_and_draw(self, surface: pygame.Surface, sim: SimulationEngine, current_real_time: float,
+                        dt: float = 0.016, is_paused: bool = False):
         canvas_rect = self.layout.center_canvas_rect
 
         # Set hardware clipping so canvas elements NEVER bleed under sidebars
@@ -166,11 +168,12 @@ class SimulationView:
         queue_count = min(len(sim.request_queue), 6)
         if queue_count > 0:
             packet_img = self.assets.get_image("packet")
+            pw, ph = packet_img.get_width(), packet_img.get_height()
             for q_idx in range(queue_count):
                 fraction = 0.25 + (q_idx / 8.5)
                 px = int(cloud_right[0] + fraction * (lb_left_mid[0] - cloud_right[0]))
                 py = int(cloud_right[1] + fraction * (lb_left_mid[1] - cloud_right[1]))
-                surface.blit(packet_img, (px - 9, py - 11))
+                surface.blit(packet_img, (px - pw // 2, py - ph // 2))
 
         # 5. Draw Load Balancer
         lb_surf = self.assets.get_image("load_balancer")
@@ -204,15 +207,20 @@ class SimulationView:
                 fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.width * progress), bar_rect.height)
                 pygame.draw.rect(surface, (253, 214, 99), fill_rect, border_radius=2)
 
-        # 7. Spawn & Animate Flying Packets
-        self._spawn_visual_packets(sim, current_real_time, lb_right_mid, server_positions)
-        self._draw_flying_packets(surface, current_real_time)
+        # 7. Spawn & Animate Flying Packets (only spawn and advance when unpaused)
+        if not is_paused:
+            self._spawn_visual_packets(sim, current_real_time, lb_right_mid, server_positions)
+        self._draw_flying_packets(surface, dt, is_paused)
 
         # Reset clip
         surface.set_clip(prev_clip)
 
     def _spawn_visual_packets(self, sim: SimulationEngine, current_real_time: float,
                               lb_right_mid: Tuple[int, int], server_positions: List[Tuple[int, int]]):
+        # Strict cap on active in-flight packets to prevent performance degradation
+        if len(self.active_packets) >= self.max_active_packets:
+            return
+
         if current_real_time - self.last_anim_spawn_time < 0.12:
             return
 
@@ -227,20 +235,23 @@ class SimulationView:
                 end_pos=(target_pos[0] - 30, target_pos[1]),
                 start_time=current_real_time,
                 duration=0.35,
-                server_id=target_idx + 1
+                server_id=target_idx + 1,
+                progress=0.0
             )
             self.next_anim_id += 1
             self.active_packets.append(packet)
             self.last_anim_spawn_time = current_real_time
 
-    def _draw_flying_packets(self, surface: pygame.Surface, current_real_time: float):
+    def _draw_flying_packets(self, surface: pygame.Surface, dt: float, is_paused: bool):
         packet_img = self.assets.get_image("packet")
+        pw, ph = packet_img.get_width(), packet_img.get_height()
         surviving = []
         for p in self.active_packets:
-            if not p.is_finished(current_real_time):
-                prog = p.get_progress(current_real_time)
-                cur_x = int(p.start_pos[0] + prog * (p.end_pos[0] - p.start_pos[0]))
-                cur_y = int(p.start_pos[1] + prog * (p.end_pos[1] - p.start_pos[1]))
-                surface.blit(packet_img, (cur_x - 9, cur_y - 11))
+            if not is_paused:
+                p.progress += dt / p.duration
+            if p.progress < 1.0:
+                cur_x = int(p.start_pos[0] + p.progress * (p.end_pos[0] - p.start_pos[0]))
+                cur_y = int(p.start_pos[1] + p.progress * (p.end_pos[1] - p.start_pos[1]))
+                surface.blit(packet_img, (cur_x - pw // 2, cur_y - ph // 2))
                 surviving.append(p)
         self.active_packets = surviving
