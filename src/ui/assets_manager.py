@@ -31,7 +31,14 @@ class AssetsManager:
             path = os.path.join(self.assets_dir, f"{key}.png")
             if os.path.exists(path):
                 try:
-                    surf = pygame.image.load(path).convert_alpha()
+                    surf = pygame.image.load(path)
+                    if pygame.display.get_surface():
+                        surf = surf.convert_alpha()
+                    if key == "packet":
+                        # 0.5x scale for request packet
+                        new_w = max(1, int(surf.get_width() * 0.5))
+                        new_h = max(1, int(surf.get_height() * 0.5))
+                        surf = pygame.transform.smoothscale(surf, (new_w, new_h))
                     self.images[key] = surf
                     continue
                 except Exception as e:
@@ -92,10 +99,10 @@ class AssetsManager:
         return surf
 
     def _draw_packet_fallback(self) -> pygame.Surface:
-        # Plain small square for packet
-        w, h = 18, 18
+        # Plain small square for packet (0.5x size)
+        w, h = 9, 9
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
-        pygame.draw.rect(surf, (138, 180, 248), (0, 0, w, h), border_radius=2)
+        pygame.draw.rect(surf, (138, 180, 248), (0, 0, w, h), border_radius=1)
         return surf
 
     def get_server_surface(self, state: ServerState) -> pygame.Surface:
