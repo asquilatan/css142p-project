@@ -1,10 +1,6 @@
 """
 Top Menu Bar with Dropdown.
-Provides application-level navigation and toggles:
-- "Show Data Center Racks"
-- "Show Real Time Telemetry"
-- "Show Controls Hud"
-- "Settings"
+Provides application-level navigation and toggles in minimalist dark aesthetic.
 """
 
 from typing import Callable
@@ -17,27 +13,28 @@ class MenuBar:
                  on_toggle_racks: Callable,
                  on_toggle_telemetry: Callable,
                  on_toggle_controls: Callable,
+                 on_reset_layout: Callable,
                  on_open_settings: Callable):
         self.layout = layout
         self.fonts = fonts
         self.on_toggle_racks = on_toggle_racks
         self.on_toggle_telemetry = on_toggle_telemetry
         self.on_toggle_controls = on_toggle_controls
+        self.on_reset_layout = on_reset_layout
         self.on_open_settings = on_open_settings
 
-        # Menu trigger button
-        self.menu_btn_rect = pygame.Rect(12, 6, 68, 24)
+        self.menu_btn_rect = pygame.Rect(12, 6, 74, 24)
         self.is_open = False
         self.is_hovered = False
 
-        # Dropdown items
-        self.dropdown_w = 230
+        self.dropdown_w = 240
         self.item_h = 32
         self.items = [
             {"id": "racks", "label": "Show Data Center Racks", "checked": True},
             {"id": "telemetry", "label": "Show Real Time Telemetry", "checked": True},
             {"id": "controls", "label": "Show Controls Hud", "checked": True},
-            {"id": "settings", "label": "⚙ Settings", "checked": None},  # Action item
+            {"id": "reset_layout", "label": "↺ Reset Node Positions", "checked": None},
+            {"id": "settings", "label": "⚙ Settings", "checked": None},
         ]
         self.hovered_item_idx = -1
 
@@ -65,12 +62,10 @@ class MenuBar:
             return False
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Click Menu button
             if self.menu_btn_rect.collidepoint(event.pos):
                 self.is_open = not self.is_open
                 return True
 
-            # Click inside dropdown
             if self.is_open and self.dropdown_rect.collidepoint(event.pos):
                 if 0 <= self.hovered_item_idx < len(self.items):
                     item = self.items[self.hovered_item_idx]
@@ -83,12 +78,14 @@ class MenuBar:
                     elif item["id"] == "controls":
                         item["checked"] = not item["checked"]
                         self.on_toggle_controls(item["checked"])
+                    elif item["id"] == "reset_layout":
+                        self.is_open = False
+                        self.on_reset_layout()
                     elif item["id"] == "settings":
                         self.is_open = False
                         self.on_open_settings()
                     return True
 
-            # Click outside closes menu
             if self.is_open:
                 self.is_open = False
                 return True
@@ -97,55 +94,50 @@ class MenuBar:
 
     def draw(self, surface: pygame.Surface):
         top_rect = self.layout.top_bar_rect
-        border_col = (25, 25, 30)
+        border_col = (48, 48, 54)
 
         # Bar background
-        pygame.draw.rect(surface, (245, 247, 250), top_rect)
+        pygame.draw.rect(surface, (24, 24, 26), top_rect)
         pygame.draw.line(surface, border_col, (0, top_rect.bottom), (top_rect.right, top_rect.bottom), 1)
 
         # Menu Button
-        btn_bg = (230, 235, 242) if (self.is_hovered or self.is_open) else (245, 247, 250)
+        btn_bg = (44, 44, 52) if (self.is_hovered or self.is_open) else (34, 34, 40)
         pygame.draw.rect(surface, btn_bg, self.menu_btn_rect, border_radius=4)
         if self.is_hovered or self.is_open:
-            pygame.draw.rect(surface, border_col, self.menu_btn_rect, width=1, border_radius=4)
+            pygame.draw.rect(surface, (80, 80, 95), self.menu_btn_rect, width=1, border_radius=4)
 
-        btn_txt = self.fonts["normal"].render("Menu ▾", True, (30, 35, 45))
-        surface.blit(btn_txt, (self.menu_btn_rect.x + 8, self.menu_btn_rect.y + 4))
+        btn_txt = self.fonts["normal"].render("Menu ▾", True, (230, 230, 235))
+        surface.blit(btn_txt, (self.menu_btn_rect.x + 10, self.menu_btn_rect.y + 4))
 
-        # Title / Project Header in top bar
+        # Title
         title_surf = self.fonts["small_bold"].render(
             "Discrete-Event Server Provisioning Simulator — CSS142",
-            True, (100, 105, 115)
+            True, (140, 145, 155)
         )
         surface.blit(title_surf, (top_rect.centerx - title_surf.get_width() // 2, top_rect.y + 10))
 
         # Dropdown Menu
         if self.is_open:
             dr = self.dropdown_rect
-            # Drop shadow
             shadow_rect = pygame.Rect(dr.x + 3, dr.y + 3, dr.width, dr.height)
-            pygame.draw.rect(surface, (180, 185, 195), shadow_rect, border_radius=6)
+            pygame.draw.rect(surface, (10, 10, 12), shadow_rect, border_radius=6)
 
-            # Dropdown body
-            pygame.draw.rect(surface, (255, 255, 255), dr, border_radius=6)
-            pygame.draw.rect(surface, border_col, dr, width=2, border_radius=6)
+            pygame.draw.rect(surface, (30, 30, 35), dr, border_radius=6)
+            pygame.draw.rect(surface, (60, 60, 70), dr, width=1, border_radius=6)
 
             for i, item in enumerate(self.items):
                 item_y = dr.y + 4 + i * self.item_h
                 item_rect = pygame.Rect(dr.x + 4, item_y, dr.width - 8, self.item_h)
 
                 if i == self.hovered_item_idx:
-                    pygame.draw.rect(surface, (235, 240, 248), item_rect, border_radius=4)
+                    pygame.draw.rect(surface, (44, 44, 52), item_rect, border_radius=4)
 
-                # Checkmark or bullet
                 if item["checked"] is True:
-                    check_surf = self.fonts["normal_bold"].render("✓", True, (46, 204, 113))
+                    check_surf = self.fonts["normal_bold"].render("✓", True, (129, 201, 149))
                     surface.blit(check_surf, (item_rect.x + 10, item_rect.y + 6))
                 elif item["checked"] is False:
                     box_rect = pygame.Rect(item_rect.x + 10, item_rect.y + 8, 14, 14)
-                    pygame.draw.rect(surface, (180, 185, 195), box_rect, width=1, border_radius=2)
+                    pygame.draw.rect(surface, (80, 80, 90), box_rect, width=1, border_radius=2)
 
-                # Label text
-                label_color = (25, 30, 40)
-                lbl_surf = self.fonts["normal"].render(item["label"], True, label_color)
+                lbl_surf = self.fonts["normal"].render(item["label"], True, (225, 225, 230))
                 surface.blit(lbl_surf, (item_rect.x + 32, item_rect.y + 7))
