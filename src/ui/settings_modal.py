@@ -1,7 +1,6 @@
 """
 Settings Modal & Runtime Hardware/Cost Tuning Drawer.
-Allows live interactive adjustment of server pool size (3-10),
-power parameters, transition latencies, and economic costs.
+Styled in the minimal Dark Theme aesthetic.
 """
 
 from typing import Callable, Optional
@@ -18,19 +17,19 @@ class SettingsModal:
         self.on_server_count_change = on_server_count_change
         self.is_open = False
 
-        # Modal window dimensions
         self.mw, self.mh = 540, 480
         self.rect = pygame.Rect((self.sw - self.mw) // 2, (self.sh - self.mh) // 2, self.mw, self.mh)
 
-        # Close button
         self.close_btn = Button(
             pygame.Rect(self.rect.right - 80, self.rect.y + 14, 66, 26),
             text="Close",
             font=fonts["small"],
-            callback=self.close
+            callback=self.close,
+            inactive_bg=(40, 40, 48),
+            inactive_text=(220, 220, 230),
+            border_color=(65, 65, 75)
         )
 
-        # Parameter Sliders
         sx = self.rect.x + 30
         sw = self.mw - 60
         y_start = self.rect.y + 70
@@ -110,7 +109,6 @@ class SettingsModal:
             if s.handle_event(event):
                 return True
 
-        # Consume clicks inside modal to prevent clicking through to canvas
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 return True
@@ -121,26 +119,23 @@ class SettingsModal:
         if not self.is_open:
             return
 
-        # Dimmer overlay over entire window
+        # Dimmer overlay
         overlay = pygame.Surface((self.sw, self.sh), pygame.SRCALPHA)
-        overlay.fill((10, 15, 20, 130))
+        overlay.fill((10, 10, 14, 180))
         surface.blit(overlay, (0, 0))
 
-        # Modal dialog box
-        pygame.draw.rect(surface, (255, 255, 255), self.rect, border_radius=8)
-        pygame.draw.rect(surface, (25, 25, 30), self.rect, width=2, border_radius=8)
+        # Modal dialog card
+        pygame.draw.rect(surface, (28, 28, 34), self.rect, border_radius=8)
+        pygame.draw.rect(surface, (55, 55, 68), self.rect, width=1, border_radius=8)
 
         # Header title
-        title_surf = self.fonts["header"].render("⚙ Hardware & Cost Configuration", True, (25, 25, 30))
+        title_surf = self.fonts["header"].render("⚙ Hardware & Cost Configuration", True, (240, 240, 245))
         surface.blit(title_surf, (self.rect.x + 24, self.rect.y + 16))
 
-        # Close button
         self.close_btn.draw(surface)
 
-        # Dividing line
-        pygame.draw.line(surface, (220, 225, 235), (self.rect.x + 20, self.rect.y + 48),
+        pygame.draw.line(surface, (45, 45, 55), (self.rect.x + 20, self.rect.y + 48),
                          (self.rect.right - 20, self.rect.y + 48), 1)
 
-        # Draw all sliders
         for s in self.sliders:
             s.draw(surface)
