@@ -7,6 +7,7 @@ from typing import Callable, Optional
 import pygame
 from src.ui.layout import Layout
 from src.ui.assets_manager import AssetsManager
+from src.ui.widgets import render_cached
 
 
 class MenuBar:
@@ -121,13 +122,14 @@ class MenuBar:
             pygame.draw.line(surface, col, (ix, iy),     (ix + 11, iy),     2)
             pygame.draw.line(surface, col, (ix, iy + 4), (ix + 11, iy + 4), 2)
 
-        btn_txt = self.fonts["normal"].render("Menu", True, (230, 230, 235))
+        btn_txt = render_cached(self.fonts["normal"], "Menu", (230, 230, 235))
         surface.blit(btn_txt, (self.menu_btn_rect.x + 26, self.menu_btn_rect.y + 4))
 
         # Title
-        title_surf = self.fonts["small_bold"].render(
+        title_surf = render_cached(
+            self.fonts["small_bold"],
             "Discrete-Event Server Provisioning Simulator — CSS142",
-            True, (140, 145, 155)
+            (140, 145, 155)
         )
         surface.blit(title_surf, (top_rect.centerx - title_surf.get_width() // 2, top_rect.y + 10))
 
@@ -148,11 +150,11 @@ class MenuBar:
                     pygame.draw.rect(surface, (44, 44, 52), item_rect, border_radius=4)
 
                 if item["checked"] is True:
-                    check_surf = self.fonts["normal_bold"].render("✓", True, (129, 201, 149))
+                    check_surf = render_cached(self.fonts["normal_bold"], "✓", (129, 201, 149))
                     surface.blit(check_surf, (item_rect.x + 10, item_rect.y + 6))
                 elif item["checked"] is False:
                     box_rect = pygame.Rect(item_rect.x + 10, item_rect.y + 8, 14, 14)
                     pygame.draw.rect(surface, (80, 80, 90), box_rect, width=1, border_radius=2)
 
-                lbl_surf = self.fonts["normal"].render(item["label"], True, (225, 225, 230))
+                lbl_surf = render_cached(self.fonts["normal"], item["label"], (225, 225, 230))
                 surface.blit(lbl_surf, (item_rect.x + 32, item_rect.y + 7))

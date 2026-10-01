@@ -11,6 +11,7 @@ import numpy as np
 import pygame
 from src.metrics import MetricsCollector
 from src.ui.assets_manager import AssetsManager
+from src.ui.widgets import render_cached
 
 
 def format_duration(sec: float) -> str:
@@ -178,8 +179,9 @@ class GraphsView:
         # ---------------------------------------------------------------------
         # Header Bar
         # ---------------------------------------------------------------------
-        title_surf = self.fonts.get("header_large", self.fonts.get("header")).render(
-            "📈 Telemetry & Waveform Analytics", True, (240, 240, 245)
+        title_surf = render_cached(
+            self.fonts.get("header_large", self.fonts.get("header")),
+            "📈 Telemetry & Waveform Analytics", (240, 240, 245)
         )
         surface.blit(title_surf, (24, 16))
 
@@ -187,14 +189,14 @@ class GraphsView:
         target_str = format_duration(target_time) if target_time else "Continuous"
         progress_pct = (current_time / t_max) * 100.0 if t_max > 0 else 0.0
         status_text = f"Elapsed: {format_duration(current_time)} / {target_str} ({min(100.0, progress_pct):.1f}%)"
-        status_surf = self.fonts.get("normal").render(status_text, True, (160, 165, 175))
+        status_surf = render_cached(self.fonts.get("normal"), status_text, (160, 165, 175))
         surface.blit(status_surf, (24, 46))
 
         # Close Button
         close_bg = (55, 36, 38)
         pygame.draw.rect(surface, close_bg, self.close_btn_rect, border_radius=4)
         pygame.draw.rect(surface, (90, 60, 64), self.close_btn_rect, width=1, border_radius=4)
-        close_txt = self.fonts.get("small_bold").render("✕ Close (X)", True, (240, 240, 245))
+        close_txt = render_cached(self.fonts.get("small_bold"), "✕ Close (X)", (240, 240, 245))
         surface.blit(close_txt, close_txt.get_rect(center=self.close_btn_rect.center))
 
         # ---------------------------------------------------------------------
@@ -295,7 +297,7 @@ class GraphsView:
             f"Facility Energy: {metrics.facility_cumulative_energy_kwh:.3f} kWh  |  "
             f"Total Incurred Cost: PHP {metrics.estimated_cost_php:,.2f}"
         )
-        footer_surf = self.fonts.get("mono", self.fonts.get("small")).render(stats_line, True, (150, 155, 165))
+        footer_surf = render_cached(self.fonts.get("mono", self.fonts.get("small")), stats_line, (150, 155, 165))
         surface.blit(footer_surf, (24, footer_y))
 
         self.window.flip()
@@ -317,14 +319,14 @@ class GraphsView:
         peak_val = max(values) if values else 0.0
 
         # Title & Metric Badges
-        title_surf = self.fonts.get("normal_bold").render(title, True, (230, 230, 235))
+        title_surf = render_cached(self.fonts.get("normal_bold"), title, (230, 230, 235))
         surface.blit(title_surf, (rect.x + 14, rect.y + 8))
 
         if unit == "PHP":
             badge_text = f"Total: PHP {current_val:,.2f}"
         else:
             badge_text = f"Current: {current_val:.1f} {unit}  |  Peak: {peak_val:.1f} {unit}"
-        badge_surf = self.fonts.get("small").render(badge_text, True, (170, 175, 185))
+        badge_surf = render_cached(self.fonts.get("small"), badge_text, (170, 175, 185))
         surface.blit(badge_surf, (rect.right - badge_surf.get_width() - 14, rect.y + 10))
 
         # Plot Dimensions
@@ -340,13 +342,13 @@ class GraphsView:
 
         # Left Y-Axis Labels
         if unit == "PHP":
-            top_y_lbl = self.fonts.get("small").render(f"PHP {max_val:,.0f}", True, (110, 115, 125))
-            mid_y_lbl = self.fonts.get("small").render(f"PHP {max_val * 0.5:,.0f}", True, (110, 115, 125))
-            bot_y_lbl = self.fonts.get("small").render("PHP 0", True, (110, 115, 125))
+            top_y_lbl = render_cached(self.fonts.get("small"), f"PHP {max_val:,.0f}", (110, 115, 125))
+            mid_y_lbl = render_cached(self.fonts.get("small"), f"PHP {max_val * 0.5:,.0f}", (110, 115, 125))
+            bot_y_lbl = render_cached(self.fonts.get("small"), "PHP 0", (110, 115, 125))
         else:
-            top_y_lbl = self.fonts.get("small").render(f"{max_val:.0f}", True, (110, 115, 125))
-            mid_y_lbl = self.fonts.get("small").render(f"{max_val * 0.5:.0f}", True, (110, 115, 125))
-            bot_y_lbl = self.fonts.get("small").render("0", True, (110, 115, 125))
+            top_y_lbl = render_cached(self.fonts.get("small"), f"{max_val:.0f}", (110, 115, 125))
+            mid_y_lbl = render_cached(self.fonts.get("small"), f"{max_val * 0.5:.0f}", (110, 115, 125))
+            bot_y_lbl = render_cached(self.fonts.get("small"), "0", (110, 115, 125))
 
         surface.blit(top_y_lbl, (plot_left - top_y_lbl.get_width() - 8, plot_top - 4))
         surface.blit(mid_y_lbl, (plot_left - mid_y_lbl.get_width() - 8, plot_top + ph // 2 - 6))
@@ -397,6 +399,6 @@ class GraphsView:
             for frac in tick_fractions:
                 tx = plot_left + int(frac * pw)
                 time_at_tick = frac * t_max
-                lbl = self.fonts.get("small").render(format_duration(time_at_tick), True, (130, 135, 145))
+                lbl = render_cached(self.fonts.get("small"), format_duration(time_at_tick), (130, 135, 145))
                 surface.blit(lbl, (tx - lbl.get_width() // 2, plot_bottom + 4))
                 pygame.draw.line(surface, (54, 54, 62), (tx, plot_bottom), (tx, plot_bottom + 3), 1)

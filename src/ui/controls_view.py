@@ -7,7 +7,7 @@ Policy radio group, Workload triggers, Traffic slider, and 24-hour clock display
 from typing import Callable, Optional
 import pygame
 from src.ui.layout import Layout
-from src.ui.widgets import Button, ButtonGroup, ToggleSwitch, Slider
+from src.ui.widgets import Button, ButtonGroup, ToggleSwitch, Slider, render_cached
 from src.ui.assets_manager import AssetsManager
 
 
@@ -212,7 +212,7 @@ class ControlsView:
         pygame.draw.line(surface, border_col, (panel.x, panel.y), (panel.x, panel.bottom), 1)
 
         # Header: Controls HUD & Reset
-        hud_title = self.fonts["header"].render("Controls HUD", True, (230, 230, 235))
+        hud_title = render_cached(self.fonts["header"], "Controls HUD", (230, 230, 235))
         surface.blit(hud_title, (panel.x + 16, panel.y + 12))
         self.reset_btn.draw(surface)
 
@@ -222,17 +222,17 @@ class ControlsView:
         self.speed_slider.draw(surface)
 
         # Policy Section Header
-        policy_lbl = self.fonts["normal"].render("Policy:", True, (160, 165, 175))
+        policy_lbl = render_cached(self.fonts["normal"], "Policy:", (160, 165, 175))
         surface.blit(policy_lbl, (panel.x + 16, panel.y + 168))
         self.policy_group.draw(surface)
 
         self.diurnal_switch.draw(surface)
 
-        drop_lbl = self.fonts["normal"].render("Abrupt Traffic Drop", True, (210, 215, 225))
+        drop_lbl = render_cached(self.fonts["normal"], "Abrupt Traffic Drop", (210, 215, 225))
         surface.blit(drop_lbl, (panel.x + 16, panel.y + 322))
         self.abrupt_drop_btn.draw(surface)
 
-        flash_lbl = self.fonts["normal"].render("Flash Crowd", True, (210, 215, 225))
+        flash_lbl = render_cached(self.fonts["normal"], "Flash Crowd", (210, 215, 225))
         surface.blit(flash_lbl, (panel.x + 16, panel.y + 358))
         self.flash_crowd_btn.draw(surface)
 
@@ -260,8 +260,8 @@ class ControlsView:
         phase_str = "(PEAK)" if is_peak else "(OFF-PEAK)"
         phase_color = (253, 214, 99) if is_peak else (150, 155, 165)
 
-        time_surf = self.fonts["large_bold"].render(time_str, True, (245, 245, 250))
-        phase_surf = self.fonts["normal"].render(phase_str, True, phase_color)
+        time_surf = render_cached(self.fonts["large_bold"], time_str, (245, 245, 250))
+        phase_surf = render_cached(self.fonts["normal"], phase_str, phase_color)
 
         surface.blit(time_surf, (panel.x + 16, clock_box_y + 10))
         surface.blit(phase_surf, (panel.right - phase_surf.get_width() - 16, clock_box_y + 16))
@@ -281,5 +281,5 @@ class ControlsView:
             elapsed_str = f"t = {elapsed_hours:.2f}h / {target_hours:.2f}h{status_suffix}"
         else:
             elapsed_str = f"t = {elapsed_hours:.1f} hours{status_suffix}"
-        elapsed_surf = self.fonts["small"].render(elapsed_str, True, (130, 135, 145))
+        elapsed_surf = render_cached(self.fonts["small"], elapsed_str, (130, 135, 145))
         surface.blit(elapsed_surf, (panel.x + 16, clock_box_y + 44))

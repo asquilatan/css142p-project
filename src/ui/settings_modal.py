@@ -7,7 +7,7 @@ discrete server pool size (NumberStepper), and hardware/cost parameters.
 from typing import Callable, Optional
 import pygame
 from src.config import SimConfig
-from src.ui.widgets import Button, Slider, NumberStepper, DurationInputs
+from src.ui.widgets import Button, Slider, NumberStepper, DurationInputs, render_cached
 
 
 class SettingsModal:
@@ -178,7 +178,7 @@ class SettingsModal:
         pygame.draw.rect(surface, (55, 55, 68), self.rect, width=1, border_radius=8)
 
         # Header title
-        title_surf = self.fonts["header"].render("⚙ Simulation Setup & Run Configuration", True, (240, 240, 245))
+        title_surf = render_cached(self.fonts["header"], "⚙ Simulation Setup & Run Configuration", (240, 240, 245))
         surface.blit(title_surf, (self.rect.x + 24, self.rect.y + 16))
 
         self.close_btn.draw(surface)

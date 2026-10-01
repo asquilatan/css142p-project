@@ -12,6 +12,7 @@ from src.simulation import SimulationEngine, PacketAnimation
 from src.server import ServerState
 from src.ui.layout import Layout
 from src.ui.assets_manager import AssetsManager
+from src.ui.widgets import render_cached
 
 
 class SimulationView:
@@ -161,7 +162,7 @@ class SimulationView:
         cloud_dest = (cloud_pos[0] - cloud_surf.get_width() // 2,
                       cloud_pos[1] - cloud_surf.get_height() // 2)
         surface.blit(cloud_surf, cloud_dest)
-        cloud_lbl = self.fonts["small_bold"].render("Cloud", True, (210, 215, 225))
+        cloud_lbl = render_cached(self.fonts["small_bold"], "Cloud", (210, 215, 225))
         surface.blit(cloud_lbl, (cloud_pos[0] - cloud_lbl.get_width() // 2, cloud_pos[1] - 8))
 
         # 4. Draw Incoming Queued Packets (Cloud -> LB)
@@ -178,8 +179,8 @@ class SimulationView:
         # 5. Draw Load Balancer
         lb_surf = self.assets.get_image("load_balancer")
         surface.blit(lb_surf, lb_rect)
-        lb_title1 = self.fonts["small_bold"].render("Load", True, (220, 225, 235))
-        lb_title2 = self.fonts["small_bold"].render("Balancer", True, (220, 225, 235))
+        lb_title1 = render_cached(self.fonts["small_bold"], "Load", (220, 225, 235))
+        lb_title2 = render_cached(self.fonts["small_bold"], "Balancer", (220, 225, 235))
         surface.blit(lb_title1, (lb_rect.centerx - lb_title1.get_width() // 2, lb_rect.bottom - 28))
         surface.blit(lb_title2, (lb_rect.centerx - lb_title2.get_width() // 2, lb_rect.bottom - 15))
 
@@ -194,8 +195,8 @@ class SimulationView:
 
             # Node labels
             name_text = f"Server {srv.server_id:02d}"
-            lbl_line1 = self.fonts["normal_bold"].render(name_text, True, (230, 230, 235))
-            lbl_line2 = self.fonts["small"].render(srv.state.value, True, (160, 165, 175))
+            lbl_line1 = render_cached(self.fonts["normal_bold"], name_text, (230, 230, 235))
+            lbl_line2 = render_cached(self.fonts["small"], srv.state.value, (160, 165, 175))
             surface.blit(lbl_line1, (dest_rect.x + 12, dest_rect.y + 10))
             surface.blit(lbl_line2, (dest_rect.x + 12, dest_rect.y + 27))
 
@@ -210,7 +211,7 @@ class SimulationView:
                 load_str = "Offline"
                 load_col = (100, 105, 115)
 
-            lbl_load = self.fonts["small"].render(load_str, True, load_col)
+            lbl_load = render_cached(self.fonts["small"], load_str, load_col)
             surface.blit(lbl_load, (dest_rect.x + 12, dest_rect.y + 43))
 
             # Boot / Wake progress bar

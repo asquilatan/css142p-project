@@ -9,7 +9,7 @@ import pygame
 from src.simulation import SimulationEngine
 from src.server import ServerState
 from src.ui.layout import Layout
-from src.ui.widgets import Button
+from src.ui.widgets import Button, render_cached
 
 
 from src.ui.assets_manager import AssetsManager
@@ -65,7 +65,7 @@ class TelemetryView:
             pygame.draw.line(surface, border_col, (racks_rect.right, racks_rect.y), (racks_rect.right, racks_rect.bottom), 1)
             pygame.draw.line(surface, border_col, (racks_rect.x, racks_rect.bottom), (racks_rect.right, racks_rect.bottom), 1)
 
-            title_surf = self.fonts["header"].render("Data Center Racks", True, (230, 230, 235))
+            title_surf = render_cached(self.fonts["header"], "Data Center Racks", (230, 230, 235))
             surface.blit(title_surf, (racks_rect.x + 18, racks_rect.y + 14))
 
             y_offset = racks_rect.y + 46
@@ -85,7 +85,7 @@ class TelemetryView:
                 dot_cy = y_offset + 9
                 pygame.draw.circle(surface, dot_color, (racks_rect.x + 18, dot_cy), 4)
 
-                name_surf = self.fonts["normal"].render(node_name, True, (215, 215, 225))
+                name_surf = render_cached(self.fonts["normal"], node_name, (215, 215, 225))
                 surface.blit(name_surf, (racks_rect.x + 28, y_offset))
 
                 # Display load per server
@@ -99,10 +99,10 @@ class TelemetryView:
                     load_text = "-"
                     load_col = (90, 95, 105)
 
-                load_surf = self.fonts["mono"].render(load_text, True, load_col)
+                load_surf = render_cached(self.fonts["mono"], load_text, load_col)
                 surface.blit(load_surf, (racks_rect.x + 102, y_offset + 1))
 
-                badge_surf = self.fonts["mono"].render(state_text, True, (160, 165, 175))
+                badge_surf = render_cached(self.fonts["mono"], state_text, (160, 165, 175))
                 surface.blit(badge_surf, (racks_rect.right - badge_surf.get_width() - 14, y_offset))
 
                 y_offset += 24
@@ -118,7 +118,7 @@ class TelemetryView:
             # 1px border divider on right
             pygame.draw.line(surface, border_col, (tele_rect.right, tele_rect.y), (tele_rect.right, tele_rect.bottom), 1)
 
-            tele_title = self.fonts["header"].render("Real Time Telemetry", True, (230, 230, 235))
+            tele_title = render_cached(self.fonts["header"], "Real Time Telemetry", (230, 230, 235))
             surface.blit(tele_title, (tele_rect.x + 18, tele_rect.y + 14))
 
             m = sim.metrics
@@ -126,8 +126,8 @@ class TelemetryView:
 
             def draw_metric_row(label: str, value: str, val_color=(230, 230, 235)):
                 nonlocal y_cursor
-                lbl_surf = self.fonts["normal"].render(label, True, (150, 155, 165))
-                val_surf = self.fonts["mono_bold"].render(value, True, val_color)
+                lbl_surf = render_cached(self.fonts["normal"], label, (150, 155, 165))
+                val_surf = render_cached(self.fonts["mono_bold"], value, val_color)
                 surface.blit(lbl_surf, (tele_rect.x + 18, y_cursor))
                 surface.blit(val_surf, (tele_rect.right - val_surf.get_width() - 18, y_cursor))
                 y_cursor += 24
@@ -140,26 +140,26 @@ class TelemetryView:
 
             # Energy Section
             y_cursor += 6
-            energy_header = self.fonts["small"].render("Energy:", True, (150, 155, 165))
+            energy_header = render_cached(self.fonts["small"], "Energy:", (150, 155, 165))
             surface.blit(energy_header, (tele_rect.x + 18, y_cursor))
             y_cursor += 15
 
             energy_val = f"{m.facility_cumulative_energy_kwh:.2f} kWh"
-            energy_surf = self.fonts["large_bold"].render(energy_val, True, (245, 245, 250))
+            energy_surf = render_cached(self.fonts["large_bold"], energy_val, (245, 245, 250))
             surface.blit(energy_surf, (tele_rect.x + 18, y_cursor))
 
             pue_val = f"(PUE: {sim.config.hardware.cooling_pue:.1f})"
-            pue_surf = self.fonts["small"].render(pue_val, True, (130, 135, 145))
+            pue_surf = render_cached(self.fonts["small"], pue_val, (130, 135, 145))
             surface.blit(pue_surf, (tele_rect.x + 18 + energy_surf.get_width() + 8, y_cursor + 8))
 
             # Cost Section
             y_cursor += 32
-            cost_header = self.fonts["small"].render("Estimated Cost:", True, (150, 155, 165))
+            cost_header = render_cached(self.fonts["small"], "Estimated Cost:", (150, 155, 165))
             surface.blit(cost_header, (tele_rect.x + 18, y_cursor))
             y_cursor += 15
 
             cost_val = f"PHP {m.estimated_cost_php:.2f}"
-            cost_surf = self.fonts["large_bold"].render(cost_val, True, (245, 245, 250))
+            cost_surf = render_cached(self.fonts["large_bold"], cost_val, (245, 245, 250))
             surface.blit(cost_surf, (tele_rect.x + 18, y_cursor))
 
             # Update & draw [Show Graphs] Button
