@@ -78,6 +78,11 @@ def main():
         + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
     )
 
+    # Speed ceiling follows the active backend: the Rust core sustains ~500
+    # min/s before frames suffer, while SimPy drops frames past ~25 min/s —
+    # so the fallback UI is hard-capped at the historic 50.
+    max_speed = 500.0 if sim.is_rust_accelerated else 50.0
+
     # Initial Provisioning Policy (Threshold-based)
     current_policy = ThresholdPolicy()
     sim.set_policy(current_policy)
@@ -138,7 +143,7 @@ def main():
 
     def on_speed_change(multiplier: float):
         nonlocal sim_speed
-        sim_speed = multiplier
+        sim_speed = max(1.0, min(max_speed, multiplier))
 
     def on_policy_change(index: int, name: str):
         nonlocal current_policy
@@ -184,7 +189,8 @@ def main():
         on_flash_crowd=on_flash_crowd,
         on_traffic_volume=on_traffic_volume,
         on_start_request=settings_modal.open,
-        assets=assets
+        assets=assets,
+        max_speed=max_speed
     )
 
     # Top Menu Bar with flex visibility toggles & layout reset

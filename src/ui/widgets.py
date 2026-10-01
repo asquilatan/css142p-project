@@ -232,6 +232,77 @@ class Slider:
         pygame.draw.circle(surface, (20, 20, 25), (handle_x, handle_y), 3)
 
 
+class NumberField:
+    """A single numeric text field: click to focus, type digits, Enter to
+    commit, Escape to revert. While focused it consumes ALL key presses so
+    global shortcuts (Space, F, G, ...) never fire mid-typing."""
+    def __init__(self, rect: pygame.Rect, font: pygame.font.Font,
+                 initial_value: int = 1, min_val: int = 1, max_val: int = 500,
+                 on_change: Optional[Callable[[float], None]] = None):
+        self.rect = pygame.Rect(rect)
+        self.font = font
+        self.min_val = int(min_val)
+        self.max_val = int(max_val)
+        self.value = max(self.min_val, min(self.max_val, int(initial_value)))
+        self.text = str(self.value)
+        self.on_change = on_change
+        self.is_focused = False
+
+    def set_value(self, value: float, notify: bool = False):
+        clamped = max(self.min_val, min(self.max_val, int(value)))
+        self.value = clamped
+        self.text = str(clamped)
+        if notify and self.on_change:
+            self.on_change(float(clamped))
+
+    def _commit(self):
+        raw = "".join(ch for ch in self.text if ch.isdigit())
+        self.set_value(int(raw) if raw else self.min_val, notify=True)
+        self.is_focused = False
+
+    def _revert(self):
+        self.text = str(self.value)
+        self.is_focused = False
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                self.is_focused = True
+                return True
+            if self.is_focused:
+                self._revert()
+            return False
+        if event.type == pygame.KEYDOWN and self.is_focused:
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._commit()
+            elif event.key == pygame.K_ESCAPE:
+                self._revert()
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif event.unicode and event.unicode.isdigit() and len(self.text) < 4:
+                self.text += event.unicode
+            return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        bg = (30, 30, 38) if self.is_focused else (26, 26, 32)
+        border = (138, 180, 248) if self.is_focused else (55, 55, 65)
+        pygame.draw.rect(surface, bg, self.rect, border_radius=4)
+        pygame.draw.rect(surface, border, self.rect, width=1 if not self.is_focused else 2,
+                         border_radius=4)
+
+        shown = self.text if (self.is_focused or self.text) else str(self.value)
+        txt_surf = render_cached(self.font, shown if shown else " ", (240, 240, 250))
+        surface.blit(txt_surf, (self.rect.x + 8, self.rect.centery - txt_surf.get_height() // 2))
+
+        if self.is_focused:
+            import time
+            if int(time.time() * 2) % 2 == 0:
+                cx = self.rect.x + 8 + txt_surf.get_width() + 2
+                pygame.draw.line(surface, (138, 180, 248),
+                                 (cx, self.rect.y + 5), (cx, self.rect.bottom - 5), 2)
+
+
 class NumberStepper:
     """An integer number stepper with [-] and [+] buttons and clear integer display."""
     def __init__(self, rect: pygame.Rect, min_val: int, max_val: int, initial_val: int,

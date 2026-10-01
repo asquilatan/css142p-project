@@ -7,7 +7,7 @@ Policy radio group, Workload triggers, Traffic slider, and 24-hour clock display
 from typing import Callable, Optional
 import pygame
 from src.ui.layout import Layout
-from src.ui.widgets import Button, ButtonGroup, ToggleSwitch, Slider, render_cached
+from src.ui.widgets import Button, ButtonGroup, ToggleSwitch, Slider, NumberField, render_cached
 from src.ui.assets_manager import AssetsManager
 
 
@@ -22,10 +22,12 @@ class ControlsView:
                  on_flash_crowd: Callable,
                  on_traffic_volume: Callable,
                  on_start_request: Optional[Callable] = None,
-                 assets: Optional[AssetsManager] = None):
+                 assets: Optional[AssetsManager] = None,
+                 max_speed: float = 50.0):
         self.layout = layout
         self.fonts = fonts
         self.assets = assets
+        self.max_speed = max(1.0, float(max_speed))
         self.is_running = False
         self.is_paused = True
         self.is_completed = False
@@ -63,19 +65,30 @@ class ControlsView:
             icon=play_icon
         )
 
-        # 3. Speed slider (1 to 50 simulated minutes per real second)
+        # 3. Speed slider (1 to max_speed simulated minutes per real second;
+        # max_speed is 500 on the Rust backend, 50 on the SimPy fallback)
         self.speed_slider = Slider(
             pygame.Rect(px, panel.y + 124, pw, 20),
             min_val=1.0,
-            max_val=50.0,
-            initial_val=1.0,
+            max_val=self.max_speed,
+            initial_val=min(1.0, self.max_speed),
             font=fonts["small"],
             label="Speed",
             unit=" min/s",
             integer_only=True,
-            on_change=on_speed_change
+            on_change=self._on_slider_speed
         )
         self.on_speed_change = on_speed_change
+
+        # 3b. Exact speed entry (two-way synced with the slider, same cap)
+        self.speed_field = NumberField(
+            pygame.Rect(px, panel.y + 146, pw, 22),
+            font=fonts["small"],
+            initial_value=1,
+            min_val=1,
+            max_val=int(self.max_speed),
+            on_change=self._on_field_speed
+        )
 
         # 4. Policy selector: [ Always-On | Threshold | Scheduled | Sleep-Buffer ]
         policy_labels = ["Always-On", "Threshold", "Scheduled", "Sleep-Buffer"]
@@ -140,6 +153,18 @@ class ControlsView:
             on_change=on_traffic_volume
         )
 
+    def _on_slider_speed(self, value: float):
+        clamped = max(1.0, min(self.max_speed, float(value)))
+        self.speed_field.set_value(clamped)
+        if self.on_speed_change:
+            self.on_speed_change(clamped)
+
+    def _on_field_speed(self, value: float):
+        clamped = max(1.0, min(self.max_speed, float(value)))
+        self.speed_slider.value = clamped
+        if self.on_speed_change:
+            self.on_speed_change(clamped)
+
     def _handle_main_button(self):
         if not self.is_running or self.is_completed:
             if self.on_start_request:
@@ -187,6 +212,8 @@ class ControlsView:
             return True
         if self.speed_slider.handle_event(event):
             return True
+        if self.speed_field.handle_event(event):
+            return True
         if self.policy_group.handle_event(event):
             return True
         if self.diurnal_switch.handle_event(event):
@@ -218,8 +245,9 @@ class ControlsView:
 
         self.play_pause_btn.draw(surface)
 
-        # Speed Slider
+        # Speed Slider + exact entry
         self.speed_slider.draw(surface)
+        self.speed_field.draw(surface)
 
         # Policy Section Header
         policy_lbl = render_cached(self.fonts["normal"], "Policy:", (160, 165, 175))
