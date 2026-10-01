@@ -12,7 +12,8 @@ class Button:
                  callback: Optional[Callable] = None, is_toggle: bool = False,
                  active_bg: tuple = (138, 180, 248), active_text: tuple = (20, 20, 25),
                  inactive_bg: tuple = (40, 40, 46), inactive_text: tuple = (225, 225, 230),
-                 border_color: tuple = (60, 60, 70)):
+                 border_color: tuple = (60, 60, 70),
+                 icon: Optional[pygame.Surface] = None):
         self.rect = pygame.Rect(rect)
         self.text = text
         self.font = font
@@ -26,6 +27,7 @@ class Button:
         self.inactive_bg = inactive_bg
         self.inactive_text = inactive_text
         self.border_color = border_color
+        self.icon = icon
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if event.type == pygame.MOUSEMOTION:
@@ -53,9 +55,21 @@ class Button:
         pygame.draw.rect(surface, bg, self.rect, border_radius=5)
         pygame.draw.rect(surface, self.border_color, self.rect, width=1, border_radius=5)
 
-        text_surf = self.font.render(self.text, True, txt_col)
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        surface.blit(text_surf, text_rect)
+        if self.icon:
+            if self.text:
+                iw = self.icon.get_width()
+                text_surf = self.font.render(self.text, True, txt_col)
+                tw = text_surf.get_width()
+                total_w = iw + 6 + tw
+                start_x = self.rect.centerx - total_w // 2
+                surface.blit(self.icon, (start_x, self.rect.centery - self.icon.get_height() // 2))
+                surface.blit(text_surf, (start_x + iw + 6, self.rect.centery - text_surf.get_height() // 2))
+            else:
+                surface.blit(self.icon, self.icon.get_rect(center=self.rect.center))
+        else:
+            text_surf = self.font.render(self.text, True, txt_col)
+            text_rect = text_surf.get_rect(center=self.rect.center)
+            surface.blit(text_surf, text_rect)
 
 
 class ButtonGroup:
@@ -258,3 +272,128 @@ class NumberStepper:
 
         self.dec_btn.draw(surface)
         self.inc_btn.draw(surface)
+
+
+class DurationInputs:
+    """
+    4-field numeric duration input widget:
+    [ _ ] months   [ _ ] days   [ _ ] hours   [ _ ] minutes
+    Defaults to zero if blank.
+    """
+    def __init__(self, rect: pygame.Rect, fonts: dict,
+                 initial_hours: int = 1, initial_minutes: int = 0,
+                 on_change: Optional[Callable[[float], None]] = None):
+        self.rect = pygame.Rect(rect)
+        self.fonts = fonts
+        self.on_change = on_change
+
+        self.labels = ["Months", "Days", "Hours", "Minutes"]
+        # String representation allows typing, backspace, blank
+        self.values = ["0", "0", str(initial_hours), str(initial_minutes)]
+        self.active_field: Optional[int] = None
+
+        field_count = 4
+        gap = 12
+        total_w = self.rect.width
+        box_w = (total_w - (field_count - 1) * gap) // field_count
+        box_h = 32
+
+        self.field_rects = []
+        for i in range(field_count):
+            fx = self.rect.x + i * (box_w + gap)
+            fy = self.rect.y + 24
+            self.field_rects.append(pygame.Rect(fx, fy, box_w, box_h))
+
+    def get_total_minutes(self) -> float:
+        mo = int(self.values[0]) if self.values[0].strip().isdigit() else 0
+        d = int(self.values[1]) if self.values[1].strip().isdigit() else 0
+        h = int(self.values[2]) if self.values[2].strip().isdigit() else 0
+        m = int(self.values[3]) if self.values[3].strip().isdigit() else 0
+        return float((mo * 30 * 24 * 60) + (d * 24 * 60) + (h * 60) + m)
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            clicked_any = False
+            for i, r in enumerate(self.field_rects):
+                if r.collidepoint(event.pos):
+                    self.active_field = i
+                    clicked_any = True
+                    return True
+            if not clicked_any and self.rect.collidepoint(event.pos):
+                self.active_field = None
+                return True
+            elif not clicked_any:
+                self.active_field = None
+
+        elif event.type == pygame.KEYDOWN and self.active_field is not None:
+            idx = self.active_field
+            if event.key == pygame.K_BACKSPACE:
+                self.values[idx] = self.values[idx][:-1]
+                if self.on_change:
+                    self.on_change(self.get_total_minutes())
+                return True
+            elif event.key == pygame.K_TAB:
+                self.active_field = (idx + 1) % 4
+                return True
+            elif event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                self.active_field = (idx + 1) % 4
+                return True
+            elif event.key in (pygame.K_LEFT, pygame.K_UP):
+                self.active_field = (idx - 1) % 4
+                return True
+            elif event.unicode.isdigit():
+                if len(self.values[idx]) < 4:
+                    if self.values[idx] == "0":
+                        self.values[idx] = event.unicode
+                    else:
+                        self.values[idx] += event.unicode
+                    if self.on_change:
+                        self.on_change(self.get_total_minutes())
+                    return True
+
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        # Section title
+        title_surf = self.fonts["normal"].render(
+            "Target Run Duration (defaults to 0 if blank):", True, (215, 220, 230)
+        )
+        surface.blit(title_surf, (self.rect.x, self.rect.y))
+
+        import time
+        now = time.time()
+        show_cursor = int(now * 2) % 2 == 0
+
+        for i, (r, lbl) in enumerate(zip(self.field_rects, self.labels)):
+            is_active = (self.active_field == i)
+
+            bg_col = (38, 38, 46) if is_active else (30, 30, 36)
+            border_col = (138, 180, 248) if is_active else (55, 55, 65)
+
+            pygame.draw.rect(surface, bg_col, r, border_radius=4)
+            pygame.draw.rect(surface, border_col, r, width=1 if not is_active else 2, border_radius=4)
+
+            val_str = self.values[i]
+            if val_str:
+                txt_surf = self.fonts["normal_bold"].render(val_str, True, (245, 245, 250))
+            else:
+                txt_surf = self.fonts["normal"].render("0", True, (90, 95, 105))
+
+            txt_rect = txt_surf.get_rect(center=r.center)
+            surface.blit(txt_surf, txt_rect)
+
+            if is_active and show_cursor:
+                cursor_x = txt_rect.right + 2
+                pygame.draw.line(surface, (138, 180, 248), (cursor_x, r.y + 6), (cursor_x, r.bottom - 6), 2)
+
+            lbl_surf = self.fonts["small"].render(lbl, True, (160, 165, 175))
+            surface.blit(lbl_surf, (r.centerx - lbl_surf.get_width() // 2, r.bottom + 4))
+
+        # Live summary text
+        total_m = self.get_total_minutes()
+        total_hours = total_m / 60.0
+        summary_str = f"= Total: {total_m:,.0f} simulated minutes ({total_hours:,.1f} hours)"
+        summary_surf = self.fonts["mono"].render(
+            summary_str, True, (129, 201, 149) if total_m > 0 else (140, 140, 150)
+        )
+        surface.blit(summary_surf, (self.rect.x, self.rect.y + 78))
