@@ -138,6 +138,9 @@ class ControlsView:
         self.on_speed_change(mult)
 
     def handle_event(self, event: pygame.event.Event) -> bool:
+        if not self.layout.show_controls:
+            return False
+
         if self.reset_btn.handle_event(event):
             return True
         if self.play_pause_btn.handle_event(event):
@@ -159,6 +162,9 @@ class ControlsView:
         return False
 
     def draw(self, surface: pygame.Surface, sim_time_seconds: float):
+        if not self.layout.show_controls:
+            return
+
         panel = self.layout.right_panel_rect
         border_col = (25, 25, 30)
 
