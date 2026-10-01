@@ -59,7 +59,7 @@ class Button:
 
 
 class ButtonGroup:
-    """Manages mutually exclusive radio buttons (e.g. Speed, Policy)."""
+    """Manages mutually exclusive radio buttons (e.g. Policy)."""
     def __init__(self, buttons: List[Button], initial_index: int = 0, on_change: Optional[Callable] = None):
         self.buttons = buttons
         self.active_index = initial_index
@@ -131,9 +131,10 @@ class ToggleSwitch:
 
 
 class Slider:
-    """A horizontal slider matching `Traffic volume [ slider ]`."""
+    """A horizontal slider with customizable units and integer snapping."""
     def __init__(self, rect: pygame.Rect, min_val: float, max_val: float,
                  initial_val: float, font: pygame.font.Font, label: str = "",
+                 unit: str = "x", integer_only: bool = False,
                  on_change: Optional[Callable] = None):
         self.rect = pygame.Rect(rect)
         self.min_val = min_val
@@ -141,6 +142,8 @@ class Slider:
         self.value = initial_val
         self.font = font
         self.label = label
+        self.unit = unit
+        self.integer_only = integer_only
         self.on_change = on_change
         self.is_dragging = False
 
@@ -164,13 +167,17 @@ class Slider:
         track_end = self.rect.right - 8
         clamped_x = min(track_end, max(track_start, mouse_x))
         fraction = (clamped_x - track_start) / max(1, track_end - track_start)
-        self.value = self.min_val + fraction * (self.max_val - self.min_val)
+        val = self.min_val + fraction * (self.max_val - self.min_val)
+        if self.integer_only:
+            val = round(val)
+        self.value = val
         if self.on_change:
             self.on_change(self.value)
 
     def draw(self, surface: pygame.Surface):
         if self.label:
-            lbl_surf = self.font.render(f"{self.label}: {self.value:.1f}x", True, (180, 185, 195))
+            val_str = f"{int(self.value)}" if self.integer_only else f"{self.value:.1f}"
+            lbl_surf = self.font.render(f"{self.label}: {val_str}{self.unit}", True, (180, 185, 195))
             surface.blit(lbl_surf, (self.rect.x, self.rect.y - 18))
 
         track_y = self.rect.centery
