@@ -165,6 +165,17 @@ class ControlsView:
         if self.on_speed_change:
             self.on_speed_change(clamped)
 
+    def set_max_speed(self, max_speed: float):
+        """Updates the speed ceiling live (backend switches, ultra unlock)."""
+        self.max_speed = max(1.0, float(max_speed))
+        self.speed_slider.max_val = self.max_speed
+        if self.speed_slider.value > self.max_speed:
+            self.speed_slider.value = self.max_speed
+        self.speed_field.max_val = int(self.max_speed)
+        self.speed_field.set_value(self.speed_slider.value)
+        if self.on_speed_change:
+            self.on_speed_change(self.speed_slider.value)
+
     def _handle_main_button(self):
         if not self.is_running or self.is_completed:
             if self.on_start_request:

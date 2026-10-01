@@ -1,24 +1,35 @@
 """
-Settings Modal & Simulation Run Setup Drawer.
-Allows configuring run duration (in simulated minutes/hours),
-discrete server pool size (NumberStepper), and hardware/cost parameters.
+Settings Modal.
+Pure configuration drawer (run length, server pool, compute backend,
+speed unlock, hardware/cost parameters). Starting runs happens from the
+main Start button; this modal never starts anything itself.
 """
 
 from typing import Callable, Optional
 import pygame
 from src.config import SimConfig
-from src.ui.widgets import Button, Slider, NumberStepper, DurationInputs, render_cached
+from src.ui.widgets import (
+    Button, ButtonGroup, Slider, NumberStepper, DurationInputs,
+    ToggleSwitch, render_cached,
+)
 
 
 class SettingsModal:
     def __init__(self, screen_size: tuple, config: SimConfig, fonts: dict,
                  on_server_count_change: Callable[[int], None],
-                 on_start_run: Optional[Callable[[float], None]] = None):
+                 backend: str = "rust",
+                 rust_available: bool = True,
+                 ultra_enabled: bool = False,
+                 on_backend_change: Optional[Callable[[str], None]] = None,
+                 on_ultra_toggle: Optional[Callable[[bool], None]] = None):
         self.sw, self.sh = screen_size
         self.config = config
         self.fonts = fonts
         self.on_server_count_change = on_server_count_change
-        self.on_start_run = on_start_run
+        self.on_backend_change = on_backend_change
+        self.on_ultra_toggle = on_ultra_toggle
+        self.rust_available = rust_available
+        self.ultra_enabled = ultra_enabled
         self.is_open = False
 
         self.run_duration_min = 60.0  # Default 60 simulated minutes
@@ -63,12 +74,48 @@ class SettingsModal:
             on_change=on_server_count_change
         )
 
-        y_cursor += 42
-        spacing = 44
+        y_cursor += 44
 
         # ---------------------------------------------------------------------
-        # 3. Hardware & Economic Tuning
+        # 3. Compute Backend (Rust accelerator vs pure-Python SimPy)
         # ---------------------------------------------------------------------
+        self.backend_label_y = y_cursor
+        bw = (sw - 8) // 2
+        backend_btns = [
+            Button(pygame.Rect(sx, y_cursor + 18, bw, 28), text="Rust",
+                   font=fonts["small"]),
+            Button(pygame.Rect(sx + bw + 8, y_cursor + 18, bw, 28), text="PySim",
+                   font=fonts["small"]),
+        ]
+        initial_backend = 0 if backend == "rust" else 1
+        if backend == "rust" and not rust_available:
+            initial_backend = 1
+        self.backend_group = ButtonGroup(
+            backend_btns, initial_index=initial_backend,
+            on_change=self._on_backend_select,
+        )
+        self.backend_status_y = y_cursor + 50
+
+        y_cursor += 72
+
+        # ---------------------------------------------------------------------
+        # 4. Ultra Speed Unlock (Rust only, up to 1440 min/s = 1 day/sec)
+        # ---------------------------------------------------------------------
+        self.ultra_switch = ToggleSwitch(
+            pygame.Rect(sx, y_cursor, sw, 26),
+            label="Unlock 1 day/sec speed",
+            font=fonts["normal"],
+            initial_state=ultra_enabled,
+            on_toggle=self._on_ultra_switch,
+        )
+        self.ultra_warning_y = y_cursor + 28
+
+        y_cursor += 50
+
+        # ---------------------------------------------------------------------
+        # 5. Hardware & Economic Tuning
+        # ---------------------------------------------------------------------
+        spacing = 38
         self.rate_slider = Slider(
             pygame.Rect(sx, y_cursor, sw, 18),
             min_val=4.0, max_val=20.0, initial_val=config.economics.cost_per_kwh_php,
@@ -112,28 +159,20 @@ class SettingsModal:
             self.pue_slider,
         ]
 
-        # ---------------------------------------------------------------------
-        # 4. Big Action Button (Bottom)
-        # ---------------------------------------------------------------------
-        self.start_btn = Button(
-            pygame.Rect(sx, self.rect.bottom - 48, sw, 36),
-            text="▶ Start Simulation Run",
-            font=fonts["normal_bold"],
-            callback=self._start_run,
-            inactive_bg=(40, 95, 60),
-            inactive_text=(255, 255, 255),
-            border_color=(76, 175, 80)
-        )
+    def _on_backend_select(self, index: int, name: str):
+        if name == "Rust" and not self.rust_available:
+            # Rust unavailable on this machine: revert the radio selection.
+            for j, b in enumerate(self.backend_group.buttons):
+                b.is_active = (j == 1)
+            self.backend_group.active_index = 1
+            return
+        if self.on_backend_change:
+            self.on_backend_change("rust" if name == "Rust" else "pysim")
 
-    def _start_run(self):
-        total_m = self.duration_inputs.get_total_minutes()
-        # If blank/0, default to 60 minutes
-        if total_m <= 0:
-            total_m = 60.0
-        self.run_duration_min = total_m
-        if self.on_start_run:
-            self.on_start_run(self.run_duration_min)
-        self.close()
+    def _on_ultra_switch(self, enabled: bool):
+        self.ultra_enabled = enabled
+        if self.on_ultra_toggle:
+            self.on_ultra_toggle(enabled)
 
     def open(self):
         self.is_open = True
@@ -147,11 +186,13 @@ class SettingsModal:
 
         if self.close_btn.handle_event(event):
             return True
-        if self.start_btn.handle_event(event):
-            return True
         if self.duration_inputs.handle_event(event):
             return True
         if self.server_stepper.handle_event(event):
+            return True
+        if self.backend_group.handle_event(event):
+            return True
+        if self.ultra_switch.handle_event(event):
             return True
 
         for s in self.sliders:
@@ -192,12 +233,28 @@ class SettingsModal:
         # Draw Server Stepper
         self.server_stepper.draw(surface)
 
+        # Compute Backend section
+        backend_lbl = render_cached(self.fonts["normal"], "Compute Backend:", (160, 165, 175))
+        surface.blit(backend_lbl, (self.rect.x + 30, self.backend_label_y))
+        self.backend_group.draw(surface)
+        if self.rust_available:
+            status_text = "sim_core detected — Rust accelerator ready"
+            status_col = (129, 201, 149)
+        else:
+            status_text = "sim_core not found — Rust unavailable, PySim only"
+            status_col = (242, 139, 130)
+        status_surf = render_cached(self.fonts["small"], status_text, status_col)
+        surface.blit(status_surf, (self.rect.x + 30, self.backend_status_y))
+
+        # Ultra speed section (with up-front warning)
+        self.ultra_switch.draw(surface)
+        warn_surf = render_cached(
+            self.fonts["small"],
+            "⚠ Rust only: visuals blur past ~500 min/s; use for fast-forwarding.",
+            (253, 214, 99),
+        )
+        surface.blit(warn_surf, (self.rect.x + 30, self.ultra_warning_y))
+
         # Draw Hardware Sliders
         for s in self.sliders:
             s.draw(surface)
-
-        # Divider above start button
-        pygame.draw.line(surface, (45, 45, 55), (self.rect.x + 20, self.rect.bottom - 60),
-                         (self.rect.right - 20, self.rect.bottom - 60), 1)
-
-        self.start_btn.draw(surface)

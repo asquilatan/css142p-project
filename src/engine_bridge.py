@@ -397,6 +397,11 @@ def _bind_library(lib: ctypes.CDLL):
     lib.sim_apply_config.restype = None
 
 
+def rust_available() -> bool:
+    """True when a loadable sim_core library is present for this platform."""
+    return _find_library() is not None
+
+
 def create_engine(config: SimConfig):
     """Builds the fastest available engine (Rust, else pure SimPy)."""
     path = _find_library()
