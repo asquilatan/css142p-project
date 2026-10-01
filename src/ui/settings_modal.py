@@ -43,7 +43,7 @@ class SettingsModal:
         self.run_duration_min = 60.0  # Default 60 simulated minutes
 
         self.mw = 560
-        self.mh = 580 if mode == "run" else 400
+        self.mh = 580 if mode == "run" else 250
         self.rect = pygame.Rect((self.sw - self.mw) // 2, (self.sh - self.mh) // 2, self.mw, self.mh)
 
         self.close_btn = Button(
@@ -88,7 +88,6 @@ class SettingsModal:
                 on_change=on_server_count_change
             )
             y_cursor += 42
-            spacing = 44
         else:
             y_cursor = self.rect.y + 60
 
@@ -121,51 +120,52 @@ class SettingsModal:
             )
             self.ultra_warning_y = y_cursor + 28
             y_cursor += 50
-            spacing = 38
 
-        # Hardware & economic sliders (both modes).
-        self.rate_slider = Slider(
-            pygame.Rect(sx, y_cursor, sw, 18),
-            min_val=4.0, max_val=20.0, initial_val=config.economics.cost_per_kwh_php,
-            font=fonts["small"], label="Electricity Rate", unit=" PHP/kWh",
-            on_change=lambda v: setattr(config.economics, "cost_per_kwh_php", v)
-        )
+        # Hardware & economic sliders (run-setup mode only).
+        if mode == "run":
+            spacing = 44
+            self.rate_slider = Slider(
+                pygame.Rect(sx, y_cursor, sw, 18),
+                min_val=4.0, max_val=20.0, initial_val=config.economics.cost_per_kwh_php,
+                font=fonts["small"], label="Electricity Rate", unit=" PHP/kWh",
+                on_change=lambda v: setattr(config.economics, "cost_per_kwh_php", v)
+            )
 
-        self.sla_slider = Slider(
-            pygame.Rect(sx, y_cursor + spacing, sw, 18),
-            min_val=0.1, max_val=5.0, initial_val=config.economics.cost_per_dropped_req_php,
-            font=fonts["small"], label="SLA Penalty per Dropped Req", unit=" PHP",
-            on_change=lambda v: setattr(config.economics, "cost_per_dropped_req_php", v)
-        )
+            self.sla_slider = Slider(
+                pygame.Rect(sx, y_cursor + spacing, sw, 18),
+                min_val=0.1, max_val=5.0, initial_val=config.economics.cost_per_dropped_req_php,
+                font=fonts["small"], label="SLA Penalty per Dropped Req", unit=" PHP",
+                on_change=lambda v: setattr(config.economics, "cost_per_dropped_req_php", v)
+            )
 
-        self.boot_slider = Slider(
-            pygame.Rect(sx, y_cursor + spacing * 2, sw, 18),
-            min_val=30.0, max_val=300.0, initial_val=config.hardware.cold_boot_delay_sec,
-            font=fonts["small"], label="Physical Cold Boot Delay", unit=" sec", integer_only=True,
-            on_change=lambda v: setattr(config.hardware, "cold_boot_delay_sec", v)
-        )
+            self.boot_slider = Slider(
+                pygame.Rect(sx, y_cursor + spacing * 2, sw, 18),
+                min_val=30.0, max_val=300.0, initial_val=config.hardware.cold_boot_delay_sec,
+                font=fonts["small"], label="Physical Cold Boot Delay", unit=" sec", integer_only=True,
+                on_change=lambda v: setattr(config.hardware, "cold_boot_delay_sec", v)
+            )
 
-        self.wake_slider = Slider(
-            pygame.Rect(sx, y_cursor + spacing * 3, sw, 18),
-            min_val=1.0, max_val=15.0, initial_val=config.hardware.sleep_wake_delay_sec,
-            font=fonts["small"], label="Sleep Wake Latency", unit=" sec",
-            on_change=lambda v: setattr(config.hardware, "sleep_wake_delay_sec", v)
-        )
+            self.wake_slider = Slider(
+                pygame.Rect(sx, y_cursor + spacing * 3, sw, 18),
+                min_val=1.0, max_val=15.0, initial_val=config.hardware.sleep_wake_delay_sec,
+                font=fonts["small"], label="Sleep Wake Latency", unit=" sec",
+                on_change=lambda v: setattr(config.hardware, "sleep_wake_delay_sec", v)
+            )
 
-        self.pue_slider = Slider(
-            pygame.Rect(sx, y_cursor + spacing * 4, sw, 18),
-            min_val=1.1, max_val=2.0, initial_val=config.hardware.cooling_pue,
-            font=fonts["small"], label="Cooling PUE Multiplier", unit="x",
-            on_change=lambda v: setattr(config.hardware, "cooling_pue", v)
-        )
+            self.pue_slider = Slider(
+                pygame.Rect(sx, y_cursor + spacing * 4, sw, 18),
+                min_val=1.1, max_val=2.0, initial_val=config.hardware.cooling_pue,
+                font=fonts["small"], label="Cooling PUE Multiplier", unit="x",
+                on_change=lambda v: setattr(config.hardware, "cooling_pue", v)
+            )
 
-        self.sliders = [
-            self.rate_slider,
-            self.sla_slider,
-            self.boot_slider,
-            self.wake_slider,
-            self.pue_slider,
-        ]
+            self.sliders = [
+                self.rate_slider,
+                self.sla_slider,
+                self.boot_slider,
+                self.wake_slider,
+                self.pue_slider,
+            ]
 
         if mode == "run":
             self.start_btn = Button(
