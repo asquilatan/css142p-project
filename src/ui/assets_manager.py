@@ -65,7 +65,7 @@ class AssetsManager:
 
     def _draw_server_fallback(self, key: str) -> pygame.Surface:
         # Plain square for server node
-        w, h = 110, 68
+        w, h = 112, 72
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
         card_bg = (38, 38, 44)
 
