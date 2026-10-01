@@ -16,12 +16,13 @@ from src.ui.telemetry_view import TelemetryView
 from src.ui.controls_view import ControlsView
 from src.ui.graphs_view import GraphsView
 from src.ui.settings_modal import SettingsModal
+from src.ui.menu_bar import MenuBar
 
 
 def init_fonts():
     pygame.font.init()
-    # Try high-legibility clean fonts with safe fallback
-    font_names = ["segoeui", "helvetica", "arial", "dejavusans", None]
+    # Prioritize Helvetica as requested by user
+    font_names = ["helvetica", "arial", "dejavusans", None]
     mono_names = ["consolas", "couriernew", "dejavusansmono", None]
 
     def pick_font(names, size, bold=False):
@@ -87,7 +88,6 @@ def main():
     def on_reset():
         nonlocal sim, current_policy
         sim = SimulationEngine(config)
-        # Re-attach selected policy
         policy_class = type(current_policy)
         current_policy = policy_class()
         sim.set_policy(current_policy)
@@ -141,6 +141,15 @@ def main():
         on_open_settings=settings_modal.open
     )
 
+    # Top Menu Bar with flex visibility toggles
+    menu_bar = MenuBar(
+        layout, fonts,
+        on_toggle_racks=lambda v: layout.set_visibility(racks=v),
+        on_toggle_telemetry=lambda v: layout.set_visibility(telemetry=v),
+        on_toggle_controls=lambda v: layout.set_visibility(controls=v),
+        on_open_settings=settings_modal.open
+    )
+
     running = True
     last_frame_time = time.time()
 
@@ -149,7 +158,6 @@ def main():
         dt = current_real_time - last_frame_time
         last_frame_time = current_real_time
 
-        # Cap dt to avoid huge time skips when window is dragged
         dt = min(dt, 0.1)
 
         # ---------------------------------------------------------------------
@@ -160,10 +168,14 @@ def main():
                 running = False
                 break
 
-            # Let modal handle events first if open
+            # Modal handles events first if open
             if settings_modal.is_open:
                 if settings_modal.handle_event(event):
                     continue
+
+            # Top menu bar handles events
+            if menu_bar.handle_event(event):
+                continue
 
             # Route events to subviews
             if controls_view.handle_event(event):
@@ -171,7 +183,7 @@ def main():
             if telemetry_view.handle_event(event):
                 continue
 
-            # Keyboard shortcuts for quick demonstration
+            # Keyboard shortcuts
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     controls_view._toggle_play_pause()
@@ -190,7 +202,6 @@ def main():
             target_sim_time = sim.env.now + sim_delta_seconds
             sim.step_simulation(target_sim_time)
 
-        # Clean finished visual packet animations
         sim.clean_packet_animations(current_real_time)
 
         # ---------------------------------------------------------------------
@@ -199,7 +210,7 @@ def main():
         # Clear background
         screen.fill(config.bg_color)
 
-        # Draw center canvas simulation topology
+        # Draw center canvas simulation topology (flexes automatically)
         simulation_view.update_and_draw(screen, sim, current_real_time)
 
         # Draw Picture-in-Picture live graphs if active
@@ -210,6 +221,9 @@ def main():
 
         # Draw right sidebar (Controls HUD)
         controls_view.draw(screen, sim.env.now)
+
+        # Draw top menu bar across the header
+        menu_bar.draw(screen)
 
         # Draw modal settings overlay on top if open
         settings_modal.draw(screen)
