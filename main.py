@@ -81,7 +81,9 @@ def main():
 
     def make_engine():
         if backend_pref == "pysim":
-            return SimulationEngine(config)
+            eng = SimulationEngine(config)
+            eng.is_rust_accelerated = False
+            return eng
         return create_engine(config)
 
     sim = make_engine()
