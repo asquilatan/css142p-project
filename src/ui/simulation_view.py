@@ -196,13 +196,27 @@ class SimulationView:
             name_text = f"Server {srv.server_id:02d}"
             lbl_line1 = self.fonts["normal_bold"].render(name_text, True, (230, 230, 235))
             lbl_line2 = self.fonts["small"].render(srv.state.value, True, (160, 165, 175))
-            surface.blit(lbl_line1, (dest_rect.x + 12, dest_rect.y + 12))
-            surface.blit(lbl_line2, (dest_rect.x + 12, dest_rect.y + 30))
+            surface.blit(lbl_line1, (dest_rect.x + 12, dest_rect.y + 10))
+            surface.blit(lbl_line2, (dest_rect.x + 12, dest_rect.y + 27))
+
+            # Real-time Load display
+            if srv.state in (ServerState.ACTIVE, ServerState.IDLE):
+                load_str = f"Load: {srv.active_request_count}/{srv.capacity}"
+                load_col = (129, 201, 149) if srv.active_request_count > 0 else (145, 150, 160)
+            elif srv.state in (ServerState.BOOTING, ServerState.WAKING):
+                load_str = f"Boot: {int(srv.get_boot_progress_pct() * 100)}%"
+                load_col = (253, 214, 99)
+            else:
+                load_str = "Offline"
+                load_col = (100, 105, 115)
+
+            lbl_load = self.fonts["small"].render(load_str, True, load_col)
+            surface.blit(lbl_load, (dest_rect.x + 12, dest_rect.y + 43))
 
             # Boot / Wake progress bar
             if srv.state in (ServerState.BOOTING, ServerState.WAKING):
                 progress = srv.get_boot_progress_pct()
-                bar_rect = pygame.Rect(dest_rect.x + 12, dest_rect.bottom - 12, dest_rect.width - 24, 4)
+                bar_rect = pygame.Rect(dest_rect.x + 12, dest_rect.bottom - 10, dest_rect.width - 24, 4)
                 pygame.draw.rect(surface, (50, 50, 60), bar_rect, border_radius=2)
                 fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.width * progress), bar_rect.height)
                 pygame.draw.rect(surface, (253, 214, 99), fill_rect, border_radius=2)
