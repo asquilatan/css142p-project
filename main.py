@@ -87,7 +87,8 @@ def main():
 
     telemetry_view = TelemetryView(
         layout, fonts,
-        on_toggle_graphs=lambda visible: graphs_view.set_visible(visible)
+        on_toggle_graphs=lambda visible: graphs_view.set_visible(visible),
+        assets=assets
     )
 
     # Control state variables
@@ -170,7 +171,8 @@ def main():
         on_abrupt_drop=on_abrupt_drop,
         on_flash_crowd=on_flash_crowd,
         on_traffic_volume=on_traffic_volume,
-        on_start_request=settings_modal.open
+        on_start_request=settings_modal.open,
+        assets=assets
     )
 
     # Top Menu Bar with flex visibility toggles & layout reset
@@ -180,7 +182,8 @@ def main():
         on_toggle_telemetry=lambda v: layout.set_visibility(telemetry=v),
         on_toggle_controls=lambda v: layout.set_visibility(controls=v),
         on_reset_layout=simulation_view.reset_positions,
-        on_open_settings=settings_modal.open
+        on_open_settings=settings_modal.open,
+        assets=assets
     )
 
     running = True
