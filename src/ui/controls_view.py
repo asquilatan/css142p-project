@@ -8,6 +8,7 @@ from typing import Callable, Optional
 import pygame
 from src.ui.layout import Layout
 from src.ui.widgets import Button, ButtonGroup, ToggleSwitch, Slider
+from src.ui.assets_manager import AssetsManager
 
 
 class ControlsView:
@@ -20,9 +21,11 @@ class ControlsView:
                  on_abrupt_drop: Callable,
                  on_flash_crowd: Callable,
                  on_traffic_volume: Callable,
-                 on_start_request: Optional[Callable] = None):
+                 on_start_request: Optional[Callable] = None,
+                 assets: Optional[AssetsManager] = None):
         self.layout = layout
         self.fonts = fonts
+        self.assets = assets
         self.is_running = False
         self.is_paused = True
         self.is_completed = False
@@ -34,26 +37,30 @@ class ControlsView:
         px = panel.x + 16
         pw = panel.width - 32
 
-        # 1. Reset button (top right header)
+        # 1. Reset button with prescribed icon
+        reset_icon = assets.get_icon("icon_reset") if assets else None
         self.reset_btn = Button(
-            pygame.Rect(panel.right - 64, panel.y + 12, 50, 24),
+            pygame.Rect(panel.right - 80, panel.y + 12, 66, 24),
             text="Reset",
             font=fonts["small"],
             callback=on_reset,
             inactive_bg=(36, 36, 42),
             inactive_text=(180, 185, 195),
-            border_color=(55, 55, 65)
+            border_color=(55, 55, 65),
+            icon=reset_icon
         )
 
-        # 2. Large Main Start / Pause button
+        # 2. Large Main Start / Pause button with prescribed icon
+        play_icon = assets.get_icon("icon_play") if assets else None
         self.play_pause_btn = Button(
             pygame.Rect(px, panel.y + 44, pw, 44),
-            text="▶ Start Simulation",
+            text="Start Simulation",
             font=fonts["header_large"],
             callback=self._handle_main_button,
             inactive_bg=(40, 95, 60),
             inactive_text=(255, 255, 255),
-            border_color=(76, 175, 80)
+            border_color=(76, 175, 80),
+            icon=play_icon
         )
 
         # 3. Speed slider (1 to 50 simulated minutes per real second)
@@ -96,21 +103,28 @@ class ControlsView:
             on_toggle=on_diurnal_toggle
         )
 
+        drop_icon = assets.get_icon("icon_drop") if assets else None
         self.abrupt_drop_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 320, 54, 24),
-            text="[ btn ]",
+            pygame.Rect(panel.right - 80, panel.y + 320, 64, 24),
+            text="Drop",
             font=fonts["small"],
-            callback=on_abrupt_drop
-        )
-
-        self.flash_crowd_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 356, 54, 24),
-            text="[ btn ]",
-            font=fonts["small"],
-            callback=on_flash_crowd,
+            callback=on_abrupt_drop,
             inactive_bg=(48, 40, 42),
             inactive_text=(242, 139, 130),
-            border_color=(120, 50, 50)
+            border_color=(100, 50, 50),
+            icon=drop_icon
+        )
+
+        surge_icon = assets.get_icon("icon_surge") if assets else None
+        self.flash_crowd_btn = Button(
+            pygame.Rect(panel.right - 80, panel.y + 356, 64, 24),
+            text="Surge",
+            font=fonts["small"],
+            callback=on_flash_crowd,
+            inactive_bg=(52, 44, 34),
+            inactive_text=(253, 214, 99),
+            border_color=(120, 90, 40),
+            icon=surge_icon
         )
 
         # 6. Traffic volume slider
@@ -145,17 +159,20 @@ class ControlsView:
 
     def update_button_visuals(self):
         if not self.is_running or self.is_completed:
-            self.play_pause_btn.text = "▶ Start Simulation" if not self.is_completed else "▶ Start New Run"
+            self.play_pause_btn.text = "Start Simulation" if not self.is_completed else "Start New Run"
+            self.play_pause_btn.icon = self.assets.get_icon("icon_play") if self.assets else None
             self.play_pause_btn.inactive_bg = (40, 95, 60)
             self.play_pause_btn.inactive_text = (255, 255, 255)
             self.play_pause_btn.border_color = (76, 175, 80)
         elif self.is_paused:
-            self.play_pause_btn.text = "> Resume"
+            self.play_pause_btn.text = "Resume"
+            self.play_pause_btn.icon = self.assets.get_icon("icon_play") if self.assets else None
             self.play_pause_btn.inactive_bg = (48, 48, 56)
             self.play_pause_btn.inactive_text = (240, 240, 245)
             self.play_pause_btn.border_color = (75, 75, 88)
         else:
-            self.play_pause_btn.text = "|| Pause"
+            self.play_pause_btn.text = "Pause"
+            self.play_pause_btn.icon = self.assets.get_icon("icon_pause") if self.assets else None
             self.play_pause_btn.inactive_bg = (44, 44, 52)
             self.play_pause_btn.inactive_text = (240, 240, 245)
             self.play_pause_btn.border_color = (65, 65, 75)
