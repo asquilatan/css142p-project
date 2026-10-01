@@ -194,7 +194,8 @@ def main():
         dt = current_real_time - last_frame_time
         last_frame_time = current_real_time
 
-        dt = min(dt, 0.1)
+        # Clamp dt to 33ms (~30 FPS minimum step) to prevent delta-time lag death spirals
+        dt = min(dt, 0.033)
 
         # ---------------------------------------------------------------------
         # 1. Event Handling
@@ -251,9 +252,6 @@ def main():
                                            is_completed=True, target_stop_time=target_sim_stop_time)
             else:
                 sim.step_simulation(next_sim_time)
-
-
-        sim.clean_packet_animations(current_real_time)
 
         # ---------------------------------------------------------------------
         # 3. Seamless Docked 3-Column Rendering Pipeline
