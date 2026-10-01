@@ -35,6 +35,11 @@ pub enum PolicyId {
     Threshold = 1,
     Scheduled = 2,
     SleepBuffer = 3,
+    /// No policy attached yet: init and ticks are no-ops. The Python bridge
+    /// creates simulations with this so the first real `set_policy` runs
+    /// exactly one init — mirroring SimPy, where no policy acts before
+    /// `attach()`.
+    None = 4,
 }
 
 impl PolicyId {
@@ -43,6 +48,7 @@ impl PolicyId {
             0 => PolicyId::AlwaysOn,
             2 => PolicyId::Scheduled,
             3 => PolicyId::SleepBuffer,
+            4 => PolicyId::None,
             _ => PolicyId::Threshold,
         }
     }
@@ -552,6 +558,7 @@ impl Simulation {
     // -- provisioning policies (mirrors src/policies/*.py) -------------
     fn apply_policy_init(&mut self) {
         match self.policy {
+            PolicyId::None => {}
             PolicyId::AlwaysOn => {
                 for i in 0..self.servers.len() {
                     if matches!(self.servers[i].state, ServerState::Off | ServerState::Sleeping) {
@@ -628,6 +635,7 @@ impl Simulation {
 
     fn apply_policy_tick(&mut self) {
         match self.policy {
+            PolicyId::None => {}
             PolicyId::AlwaysOn => {
                 for i in 0..self.servers.len() {
                     match self.servers[i].state {

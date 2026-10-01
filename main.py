@@ -9,7 +9,7 @@ import sys
 import time
 import pygame
 from src.config import SimConfig
-from src.simulation import SimulationEngine
+from src.engine_bridge import create_engine
 from src.policies import AlwaysOnPolicy, ThresholdPolicy, ScheduledPolicy, SleepBufferPolicy
 from src.ui.layout import Layout
 from src.ui.assets_manager import AssetsManager
@@ -70,9 +70,13 @@ def main():
     clock = pygame.time.Clock()
     fonts = init_fonts()
 
-    # Core Configuration & Simulation Engine
+    # Core Configuration & Simulation Engine (Rust-accelerated when available)
     config = SimConfig(num_servers=5)
-    sim = SimulationEngine(config)
+    sim = create_engine(config)
+    pygame.display.set_caption(
+        "Data Center Server Provisioning — Control Room"
+        + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
+    )
 
     # Initial Provisioning Policy (Threshold-based)
     current_policy = ThresholdPolicy()
@@ -109,7 +113,11 @@ def main():
 
     def on_reset():
         nonlocal sim, current_policy, is_running, is_paused, target_sim_stop_time
-        sim = SimulationEngine(config)
+        sim = create_engine(config)
+        pygame.display.set_caption(
+            "Data Center Server Provisioning — Control Room"
+            + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
+        )
         policy_class = type(current_policy)
         current_policy = policy_class()
         sim.set_policy(current_policy)
