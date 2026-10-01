@@ -150,8 +150,7 @@ def main():
         on_diurnal_toggle=on_diurnal_toggle,
         on_abrupt_drop=on_abrupt_drop,
         on_flash_crowd=on_flash_crowd,
-        on_traffic_volume=on_traffic_volume,
-        on_open_settings=settings_modal.open
+        on_traffic_volume=on_traffic_volume
     )
 
     # Top Menu Bar with flex visibility toggles & layout reset
@@ -216,9 +215,11 @@ def main():
         # 2. Discrete-Event Simulation Step (SimPy + Delta Time)
         # ---------------------------------------------------------------------
         if not is_paused:
-            sim_delta_seconds = dt * sim_speed
+            # 1 speed unit = 1 simulated minute (60 seconds) per real second
+            sim_delta_seconds = dt * sim_speed * 60.0
             target_sim_time = sim.env.now + sim_delta_seconds
             sim.step_simulation(target_sim_time)
+
 
         sim.clean_packet_animations(current_real_time)
 
