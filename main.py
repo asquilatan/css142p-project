@@ -83,7 +83,11 @@ def main():
     assets = AssetsManager(assets_dir="assets")
 
     simulation_view = SimulationView(layout, assets, fonts)
-    graphs_view = GraphsView(layout, fonts)
+    graphs_view = GraphsView(
+        fonts=fonts,
+        assets=assets,
+        on_close=lambda vis: telemetry_view.set_graphs_active(vis)
+    )
 
     telemetry_view = TelemetryView(
         layout, fonts,
@@ -201,6 +205,10 @@ def main():
         # 1. Event Handling
         # ---------------------------------------------------------------------
         for event in pygame.event.get():
+            # Handle secondary telemetry window events first
+            if graphs_view.handle_event(event):
+                continue
+
             if event.type == pygame.QUIT:
                 running = False
                 break
@@ -233,7 +241,7 @@ def main():
                 elif event.key == pygame.K_r:
                     on_reset()
                 elif event.key == pygame.K_g:
-                    graphs_view.set_visible(not graphs_view.is_visible)
+                    graphs_view.toggle_visible()
 
         # ---------------------------------------------------------------------
         # 2. Discrete-Event Simulation Step (SimPy + Delta Time)
@@ -262,9 +270,6 @@ def main():
         # Draw center canvas simulation topology (hardware clipped to center column)
         simulation_view.update_and_draw(screen, sim, current_real_time, dt, is_paused)
 
-        # Draw Picture-in-Picture live graphs if active
-        graphs_view.draw(screen, sim.metrics)
-
         # Draw left sidebar (Data Center Racks & Real Time Telemetry)
         telemetry_view.draw(screen, sim)
 
@@ -278,8 +283,13 @@ def main():
         settings_modal.draw(screen)
 
         pygame.display.flip()
+
+        # Update and render dedicated secondary graphs window if active
+        graphs_view.update_and_draw(sim.metrics, sim.env.now, target_sim_stop_time)
+
         clock.tick(60)
 
+    graphs_view.window.destroy()
     pygame.quit()
     sys.exit(0)
 
