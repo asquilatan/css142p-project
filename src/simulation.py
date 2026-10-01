@@ -95,8 +95,48 @@ class SimulationEngine:
     # SimPy Processes & Dispatch
     # -------------------------------------------------------------------------
 
+    def _find_ready_server(self) -> Optional[Server]:
+        """Finds the next ready server with available capacity in fair round-robin order."""
+        num_servers = len(self.servers)
+        if num_servers == 0:
+            return None
+        for offset in range(num_servers):
+            idx = (self.lb_round_robin_idx + offset) % num_servers
+            srv = self.servers[idx]
+            if srv.can_accept_request():
+                self.lb_round_robin_idx = (idx + 1) % num_servers
+                return srv
+        return None
+
+    def _start_serving(self, server: Server, req: dict):
+        """Starts request execution on server via direct SimPy event callback without Process overhead."""
+        server.reserve_slot()
+        evt = self.env.timeout(req["service_time"])
+        evt.callbacks.append(lambda _evt, s=server, r=req: self._on_request_completed(s, r))
+
+    def _on_request_completed(self, server: Server, req: dict):
+        """Handles request completion, invokes policy hook, and performs O(1) handoff to queued requests."""
+        server.release_slot()
+        self.metrics.total_requests_served += 1
+        if self.policy:
+            self.policy.on_completion(server, req)
+
+        # Clean expired requests from front of queue (SLA Timeout Drop)
+        now = self.env.now
+        timeout_limit = self.config.workload.request_timeout_sec
+        while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
+            self.request_queue.popleft()
+            self.metrics.total_requests_dropped += 1
+
+        # Direct O(1) server handoff: server that just freed a slot takes next item
+        if self.request_queue and server.can_accept_request():
+            next_req = self.request_queue.popleft()
+            self._start_serving(server, next_req)
+
+        self.metrics.current_queue_depth = len(self.request_queue)
+
     def _arrival_loop(self):
-        """Generates Poisson request arrivals, enqueues, and triggers dispatch."""
+        """Generates Poisson request arrivals, enqueues, and triggers direct O(1) dispatch."""
         while True:
             interarrival = self.workload.get_next_interarrival_time(self.env.now)
             yield self.env.timeout(interarrival)
@@ -114,14 +154,20 @@ class SimulationEngine:
                 "service_time": self.config.workload.mean_service_time_sec
             }
             self.next_request_id += 1
-            self.request_queue.append(req)
-            self.metrics.current_queue_depth = len(self.request_queue)
 
             if self.policy:
                 self.policy.on_arrival(req)
 
-            # Immediately attempt to dispatch newly arrived request
-            self._try_dispatch()
+            # If queue is empty, attempt immediate round-robin dispatch to a ready server
+            if not self.request_queue:
+                chosen_server = self._find_ready_server()
+                if chosen_server is not None:
+                    self._start_serving(chosen_server, req)
+                    continue
+
+            # Otherwise (or if all servers busy), append to queue
+            self.request_queue.append(req)
+            self.metrics.current_queue_depth = len(self.request_queue)
 
     def _try_dispatch(self):
         """
@@ -144,22 +190,13 @@ class SimulationEngine:
 
         # Distribute queued requests across ready servers
         while self.request_queue:
-            chosen_server = None
-            for offset in range(num_servers):
-                idx = (self.lb_round_robin_idx + offset) % num_servers
-                srv = self.servers[idx]
-                if srv.can_accept_request():
-                    chosen_server = srv
-                    self.lb_round_robin_idx = (idx + 1) % num_servers
-                    break
-
+            chosen_server = self._find_ready_server()
             if chosen_server is None:
                 # All servers are currently at capacity, booting, or off
                 break
 
             req = self.request_queue.popleft()
-            chosen_server.reserve_slot()
-            self.env.process(self._execute_request(chosen_server, req))
+            self._start_serving(chosen_server, req)
 
         self.metrics.current_queue_depth = len(self.request_queue)
 
@@ -176,15 +213,6 @@ class SimulationEngine:
                 self.policy.on_tick(now)
 
             yield self.env.timeout(0.1)  # 100ms periodic resolution
-
-    def _execute_request(self, server: Server, req: dict):
-        """Executes request directly on server generator without nested sub-process overhead."""
-        yield from server.serve_request(req["service_time"])
-        self.metrics.total_requests_served += 1
-        if self.policy:
-            self.policy.on_completion(server, req)
-        # Immediately dispatch queued items to newly available capacity
-        self._try_dispatch()
 
     def _telemetry_loop(self):
         """Periodically samples system metrics for full-timeline graph rendering."""
