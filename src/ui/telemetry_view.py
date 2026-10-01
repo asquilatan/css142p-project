@@ -142,3 +142,11 @@ class TelemetryView:
             btn_y = tele_rect.bottom - 44
             self.graphs_btn.rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
             self.graphs_btn.draw(surface)
+
+        # ---------------------------------------------------------------------
+        # 3. Horizontal Separator between Racks and Telemetry
+        # ---------------------------------------------------------------------
+        if self.layout.show_racks and self.layout.show_telemetry:
+            sep_y = self.layout.racks_panel_rect.bottom
+            pygame.draw.line(surface, border_col, (0, sep_y), (self.layout.left_panel_rect.right, sep_y), 1)
+
