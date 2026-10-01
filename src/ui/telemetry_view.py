@@ -41,6 +41,11 @@ class TelemetryView:
         if self.on_toggle_graphs:
             self.on_toggle_graphs(self.show_graphs_active)
 
+    def set_graphs_active(self, active: bool):
+        """Synchronizes toggle state when secondary window is closed."""
+        self.show_graphs_active = active
+        self.graphs_btn.is_active = active
+
     def handle_event(self, event: pygame.event.Event) -> bool:
         if not self.layout.show_telemetry:
             return False
