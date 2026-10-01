@@ -3,9 +3,10 @@ Top Menu Bar with Dropdown.
 Provides application-level navigation and toggles in minimalist dark aesthetic.
 """
 
-from typing import Callable
+from typing import Callable, Optional
 import pygame
 from src.ui.layout import Layout
+from src.ui.assets_manager import AssetsManager
 
 
 class MenuBar:
@@ -14,16 +15,18 @@ class MenuBar:
                  on_toggle_telemetry: Callable,
                  on_toggle_controls: Callable,
                  on_reset_layout: Callable,
-                 on_open_settings: Callable):
+                 on_open_settings: Callable,
+                 assets: Optional[AssetsManager] = None):
         self.layout = layout
         self.fonts = fonts
+        self.assets = assets
         self.on_toggle_racks = on_toggle_racks
         self.on_toggle_telemetry = on_toggle_telemetry
         self.on_toggle_controls = on_toggle_controls
         self.on_reset_layout = on_reset_layout
         self.on_open_settings = on_open_settings
 
-        self.menu_btn_rect = pygame.Rect(12, 6, 74, 24)
+        self.menu_btn_rect = pygame.Rect(12, 6, 78, 24)
         self.is_open = False
         self.is_hovered = False
 
@@ -106,8 +109,20 @@ class MenuBar:
         if self.is_hovered or self.is_open:
             pygame.draw.rect(surface, (80, 80, 95), self.menu_btn_rect, width=1, border_radius=4)
 
-        btn_txt = self.fonts["normal"].render("Menu ▾", True, (230, 230, 235))
-        surface.blit(btn_txt, (self.menu_btn_rect.x + 10, self.menu_btn_rect.y + 4))
+        # Draw icon (from assets if available, or procedural 3-line hamburger icon)
+        menu_icon = self.assets.get_icon("icon_menu") if self.assets else None
+        if menu_icon:
+            surface.blit(menu_icon, (self.menu_btn_rect.x + 8, self.menu_btn_rect.centery - menu_icon.get_height() // 2))
+        else:
+            ix = self.menu_btn_rect.x + 9
+            iy = self.menu_btn_rect.centery
+            col = (230, 230, 235)
+            pygame.draw.line(surface, col, (ix, iy - 4), (ix + 11, iy - 4), 2)
+            pygame.draw.line(surface, col, (ix, iy),     (ix + 11, iy),     2)
+            pygame.draw.line(surface, col, (ix, iy + 4), (ix + 11, iy + 4), 2)
+
+        btn_txt = self.fonts["normal"].render("Menu", True, (230, 230, 235))
+        surface.blit(btn_txt, (self.menu_btn_rect.x + 26, self.menu_btn_rect.y + 4))
 
         # Title
         title_surf = self.fonts["small_bold"].render(
