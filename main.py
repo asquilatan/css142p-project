@@ -1,8 +1,10 @@
 """
 Main Entry Point — Data Center Server Provisioning Simulation.
-Integrates SimPy discrete events with Pygame 60 FPS visual control room.
+Minimalist Dark Theme (#212121) with Google Sans typography,
+draggable movable nodes, and flex-like docked 3-column control room.
 """
 
+import os
 import sys
 import time
 import pygame
@@ -21,12 +23,20 @@ from src.ui.menu_bar import MenuBar
 
 def init_fonts():
     pygame.font.init()
-    # Prioritize Helvetica as requested by user
-    font_names = ["helvetica", "arial", "dejavusans", None]
-    mono_names = ["consolas", "couriernew", "dejavusansmono", None]
 
-    def pick_font(names, size, bold=False):
-        for n in names:
+    # Load Google Sans directly from assets/fonts/ (clean sans typography)
+    gs_regular = "assets/fonts/GoogleSans-Regular.ttf"
+    gs_medium = "assets/fonts/GoogleSans-Medium.ttf"
+    gs_bold = "assets/fonts/GoogleSans-Bold.ttf"
+
+    def get_font(path, fallback_names, size, bold=False):
+        if os.path.exists(path):
+            try:
+                return pygame.font.Font(path, size)
+            except Exception:
+                pass
+        # Fallback to system fonts
+        for n in fallback_names:
             try:
                 f = pygame.font.SysFont(n, size, bold=bold)
                 if f:
@@ -35,16 +45,19 @@ def init_fonts():
                 continue
         return pygame.font.Font(None, size)
 
+    fallbacks = ["helvetica", "arial", "dejavusans", None]
+    mono_fallbacks = ["consolas", "couriernew", "dejavusansmono", None]
+
     return {
-        "small": pick_font(font_names, 13),
-        "small_bold": pick_font(font_names, 13, bold=True),
-        "normal": pick_font(font_names, 15),
-        "normal_bold": pick_font(font_names, 15, bold=True),
-        "header": pick_font(font_names, 18, bold=True),
-        "header_large": pick_font(font_names, 22, bold=True),
-        "large_bold": pick_font(font_names, 26, bold=True),
-        "mono": pick_font(mono_names, 13),
-        "mono_bold": pick_font(mono_names, 14, bold=True),
+        "small": get_font(gs_regular, fallbacks, 13),
+        "small_bold": get_font(gs_bold, fallbacks, 13, bold=True),
+        "normal": get_font(gs_regular, fallbacks, 15),
+        "normal_bold": get_font(gs_bold, fallbacks, 15, bold=True),
+        "header": get_font(gs_bold, fallbacks, 18, bold=True),
+        "header_large": get_font(gs_bold, fallbacks, 22, bold=True),
+        "large_bold": get_font(gs_bold, fallbacks, 26, bold=True),
+        "mono": get_font(gs_regular, mono_fallbacks, 13),
+        "mono_bold": get_font(gs_bold, mono_fallbacks, 14, bold=True),
     }
 
 
@@ -52,7 +65,7 @@ def main():
     pygame.init()
     screen_width, screen_height = 1280, 720
     screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption("Data Center Server Provisioning — Discrete-Event Simulation")
+    pygame.display.set_caption("Data Center Server Provisioning — Control Room")
 
     clock = pygame.time.Clock()
     fonts = init_fonts()
@@ -141,12 +154,13 @@ def main():
         on_open_settings=settings_modal.open
     )
 
-    # Top Menu Bar with flex visibility toggles
+    # Top Menu Bar with flex visibility toggles & layout reset
     menu_bar = MenuBar(
         layout, fonts,
         on_toggle_racks=lambda v: layout.set_visibility(racks=v),
         on_toggle_telemetry=lambda v: layout.set_visibility(telemetry=v),
         on_toggle_controls=lambda v: layout.set_visibility(controls=v),
+        on_reset_layout=simulation_view.reset_positions,
         on_open_settings=settings_modal.open
     )
 
@@ -183,6 +197,10 @@ def main():
             if telemetry_view.handle_event(event):
                 continue
 
+            # Movable node drag-and-drop handling
+            if simulation_view.handle_event(event, len(sim.servers)):
+                continue
+
             # Keyboard shortcuts
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
@@ -205,12 +223,12 @@ def main():
         sim.clean_packet_animations(current_real_time)
 
         # ---------------------------------------------------------------------
-        # 3. Rendering Pipeline
+        # 3. Seamless Docked 3-Column Rendering Pipeline
         # ---------------------------------------------------------------------
-        # Clear background
+        # Fill base background (#212121)
         screen.fill(config.bg_color)
 
-        # Draw center canvas simulation topology (flexes automatically)
+        # Draw center canvas simulation topology (hardware clipped to center column)
         simulation_view.update_and_draw(screen, sim, current_real_time)
 
         # Draw Picture-in-Picture live graphs if active
