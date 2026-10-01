@@ -265,7 +265,7 @@ class GraphsView:
             timestamps=metrics.history_timestamps,
             values=metrics.history_cost_php,
             color=(253, 214, 99),  # Gold / Amber
-            unit="₱",
+            unit="PHP",
             fixed_max=100.0,
             t_max=t_max,
             current_time=current_time,
@@ -283,7 +283,7 @@ class GraphsView:
             f"Served: {metrics.total_requests_served:,}  |  "
             f"Dropped: {metrics.total_requests_dropped:,} ({drop_rate:.1f}%)  |  "
             f"Facility Energy: {metrics.facility_cumulative_energy_kwh:.3f} kWh  |  "
-            f"Total Incurred Cost: ₱{metrics.estimated_cost_php:.2f}"
+            f"Total Incurred Cost: PHP {metrics.estimated_cost_php:,.2f}"
         )
         footer_surf = self.fonts.get("mono", self.fonts.get("small")).render(stats_line, True, (150, 155, 165))
         surface.blit(footer_surf, (24, footer_y))
@@ -310,8 +310,8 @@ class GraphsView:
         title_surf = self.fonts.get("normal_bold").render(title, True, (230, 230, 235))
         surface.blit(title_surf, (rect.x + 14, rect.y + 8))
 
-        if unit == "₱":
-            badge_text = f"Total: ₱{current_val:.2f}"
+        if unit == "PHP":
+            badge_text = f"Total: PHP {current_val:,.2f}"
         else:
             badge_text = f"Current: {current_val:.1f} {unit}  |  Peak: {peak_val:.1f} {unit}"
         badge_surf = self.fonts.get("small").render(badge_text, True, (170, 175, 185))
@@ -329,10 +329,10 @@ class GraphsView:
         max_val = max(1.0, max_val)
 
         # Left Y-Axis Labels
-        if unit == "₱":
-            top_y_lbl = self.fonts.get("small").render(f"₱{max_val:.0f}", True, (110, 115, 125))
-            mid_y_lbl = self.fonts.get("small").render(f"₱{max_val * 0.5:.0f}", True, (110, 115, 125))
-            bot_y_lbl = self.fonts.get("small").render("₱0", True, (110, 115, 125))
+        if unit == "PHP":
+            top_y_lbl = self.fonts.get("small").render(f"PHP {max_val:,.0f}", True, (110, 115, 125))
+            mid_y_lbl = self.fonts.get("small").render(f"PHP {max_val * 0.5:,.0f}", True, (110, 115, 125))
+            bot_y_lbl = self.fonts.get("small").render("PHP 0", True, (110, 115, 125))
         else:
             top_y_lbl = self.fonts.get("small").render(f"{max_val:.0f}", True, (110, 115, 125))
             mid_y_lbl = self.fonts.get("small").render(f"{max_val * 0.5:.0f}", True, (110, 115, 125))
