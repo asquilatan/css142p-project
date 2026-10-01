@@ -277,6 +277,14 @@ def main():
                 running = False
                 break
 
+            if event.type == pygame.WINDOWCLOSE:
+                # Main-window X button. Reached only for the main window:
+                # GraphsView consumes its own window's close event above.
+                # (With a secondary pygame.Window alive, SDL reports the
+                # main display window's close as WINDOWCLOSE, never QUIT.)
+                running = False
+                break
+
             # Modal handles events first if open
             if settings_modal.is_open:
                 if settings_modal.handle_event(event):
