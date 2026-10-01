@@ -189,7 +189,7 @@ class SimulationEngine:
     def _telemetry_loop(self):
         """Periodically samples system metrics for full-timeline graph rendering."""
         while True:
-            yield self.env.timeout(1.0)  # Sample every 1.0 simulated second
+            yield self.env.timeout(2.0)  # Sample every 2.0 simulated seconds
             rate = self.workload.get_current_arrival_rate(self.env.now)
             self.metrics.record_sample(self.env.now, self.servers, rate)
 
