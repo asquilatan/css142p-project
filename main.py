@@ -92,19 +92,36 @@ def main():
 
     # Control state variables
     sim_speed = 5.0
-    is_paused = False
+    is_paused = True
+    is_running = False
+    target_sim_stop_time: Optional[float] = None
 
     def on_play_pause(paused: bool):
         nonlocal is_paused
         is_paused = paused
+        controls_view.set_run_state(is_running=is_running, is_paused=is_paused,
+                                   is_completed=False, target_stop_time=target_sim_stop_time)
 
     def on_reset():
-        nonlocal sim, current_policy
+        nonlocal sim, current_policy, is_running, is_paused, target_sim_stop_time
         sim = SimulationEngine(config)
         policy_class = type(current_policy)
         current_policy = policy_class()
         sim.set_policy(current_policy)
         simulation_view.active_packets.clear()
+        is_running = False
+        is_paused = True
+        target_sim_stop_time = None
+        controls_view.set_run_state(is_running=False, is_paused=True,
+                                   is_completed=False, target_stop_time=None)
+
+    def on_start_run(duration_minutes: float):
+        nonlocal is_running, is_paused, target_sim_stop_time
+        is_running = True
+        is_paused = False
+        target_sim_stop_time = sim.env.now + duration_minutes * 60.0
+        controls_view.set_run_state(is_running=True, is_paused=False,
+                                   is_completed=False, target_stop_time=target_sim_stop_time)
 
     def on_speed_change(multiplier: float):
         nonlocal sim_speed
@@ -139,7 +156,8 @@ def main():
 
     settings_modal = SettingsModal(
         (screen_width, screen_height), config, fonts,
-        on_server_count_change=on_server_count_change
+        on_server_count_change=on_server_count_change,
+        on_start_run=on_start_run
     )
 
     controls_view = ControlsView(
@@ -151,7 +169,8 @@ def main():
         on_diurnal_toggle=on_diurnal_toggle,
         on_abrupt_drop=on_abrupt_drop,
         on_flash_crowd=on_flash_crowd,
-        on_traffic_volume=on_traffic_volume
+        on_traffic_volume=on_traffic_volume,
+        on_start_request=settings_modal.open
     )
 
     # Top Menu Bar with flex visibility toggles & layout reset
@@ -204,7 +223,7 @@ def main():
             # Keyboard shortcuts
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    controls_view._toggle_play_pause()
+                    controls_view._handle_main_button()
                 elif event.key == pygame.K_f:
                     on_flash_crowd()
                 elif event.key == pygame.K_r:
@@ -215,11 +234,20 @@ def main():
         # ---------------------------------------------------------------------
         # 2. Discrete-Event Simulation Step (SimPy + Delta Time)
         # ---------------------------------------------------------------------
-        if not is_paused:
+        if is_running and not is_paused:
             # 1 speed unit = 1 simulated minute (60 seconds) per real second
             sim_delta_seconds = dt * sim_speed * 60.0
-            target_sim_time = sim.env.now + sim_delta_seconds
-            sim.step_simulation(target_sim_time)
+            next_sim_time = sim.env.now + sim_delta_seconds
+
+            if target_sim_stop_time is not None and next_sim_time >= target_sim_stop_time:
+                # Simulation reached target duration!
+                sim.step_simulation(target_sim_stop_time)
+                is_running = False
+                is_paused = True
+                controls_view.set_run_state(is_running=False, is_paused=True,
+                                           is_completed=True, target_stop_time=target_sim_stop_time)
+            else:
+                sim.step_simulation(next_sim_time)
 
 
         sim.clean_packet_animations(current_real_time)
