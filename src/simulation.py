@@ -208,6 +208,9 @@ class SimulationEngine:
         """
         Periodic housekeeping process:
         Checks queue timeouts, executes policy ticks, and retries dispatch.
+        Runs every 0.5 simulated seconds: all policy cooldowns are >= 12s and
+        the SLA timeout is 3.0s, so 10Hz polling only burns event throughput.
+        (Timeout purges also run on every request completion.)
         """
         while True:
             now = self.env.now
@@ -216,7 +219,7 @@ class SimulationEngine:
             if self.policy:
                 self.policy.on_tick(now)
 
-            yield self.env.timeout(0.1)  # 100ms periodic resolution
+            yield self.env.timeout(0.5)  # 500ms periodic resolution
 
     def _telemetry_loop(self):
         """Periodically samples system metrics for full-timeline graph rendering."""
