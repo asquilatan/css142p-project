@@ -52,8 +52,8 @@ class SimulationEngine:
         # Provisioning Policy (set externally)
         self.policy = None
 
-        # Visual packet animations for Pygame
-        self.flying_packets: List[PacketAnimation] = []
+        # Round-robin load balancer index pointer
+        self.lb_round_robin_idx: int = 0
 
         # Start primary SimPy background processes
         self.arrival_process = self.env.process(self._arrival_loop())
@@ -62,6 +62,7 @@ class SimulationEngine:
 
     def _init_servers(self, count: int):
         self.servers.clear()
+        self.lb_round_robin_idx = 0
         for i in range(count):
             srv = Server(self.env, server_id=i + 1, hw_config=self.config.hardware,
                          capacity=self.config.server_capacity_concurrency)
@@ -83,6 +84,7 @@ class SimulationEngine:
             while len(self.servers) > new_count:
                 srv = self.servers.pop()
                 srv.power_off()
+        self.lb_round_robin_idx = 0
 
     def set_policy(self, policy):
         """Attaches a provisioning policy."""
@@ -90,11 +92,11 @@ class SimulationEngine:
         self.policy.attach(self)
 
     # -------------------------------------------------------------------------
-    # SimPy Processes
+    # SimPy Processes & Dispatch
     # -------------------------------------------------------------------------
 
     def _arrival_loop(self):
-        """Generates Poisson request arrivals and inserts into queue."""
+        """Generates Poisson request arrivals, enqueues, and triggers dispatch."""
         while True:
             interarrival = self.workload.get_next_interarrival_time(self.env.now)
             yield self.env.timeout(interarrival)
@@ -118,50 +120,75 @@ class SimulationEngine:
             if self.policy:
                 self.policy.on_arrival(req)
 
+            # Immediately attempt to dispatch newly arrived request
+            self._try_dispatch()
+
+    def _try_dispatch(self):
+        """
+        Load Balancer Round-Robin dispatch:
+        Purges timed-out requests (SLA drops) and assigns queued requests
+        to ready servers in fair round-robin order.
+        """
+        now = self.env.now
+        timeout_limit = self.config.workload.request_timeout_sec
+
+        # Clean expired requests from front of queue (SLA Timeout Drop)
+        while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
+            self.request_queue.popleft()
+            self.metrics.total_requests_dropped += 1
+
+        num_servers = len(self.servers)
+        if num_servers == 0 or not self.request_queue:
+            self.metrics.current_queue_depth = len(self.request_queue)
+            return
+
+        # Distribute queued requests across ready servers
+        while self.request_queue:
+            chosen_server = None
+            for offset in range(num_servers):
+                idx = (self.lb_round_robin_idx + offset) % num_servers
+                srv = self.servers[idx]
+                if srv.can_accept_request():
+                    chosen_server = srv
+                    self.lb_round_robin_idx = (idx + 1) % num_servers
+                    break
+
+            if chosen_server is None:
+                # All servers are currently at capacity, booting, or off
+                break
+
+            req = self.request_queue.popleft()
+            self.env.process(self._execute_request(chosen_server, req))
+
+        self.metrics.current_queue_depth = len(self.request_queue)
+
     def _dispatch_loop(self):
         """
-        Load Balancer dispatch process:
-        Examines incoming queue, checks timeouts, and routes requests to ready servers.
+        Periodic housekeeping process:
+        Checks queue timeouts, executes policy ticks, and retries dispatch.
         """
-        timeout_limit = self.config.workload.request_timeout_sec
         while True:
             now = self.env.now
-
-            # Clean expired requests from front of queue (SLA Timeout Drop)
-            while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
-                self.request_queue.popleft()
-                self.metrics.total_requests_dropped += 1
-            self.metrics.current_queue_depth = len(self.request_queue)
-
-            # Try to dispatch queued requests to ready servers (IDLE or ACTIVE with capacity)
-            if self.request_queue:
-                # Find available servers
-                ready_servers = [s for s in self.servers if s.can_accept_request()]
-                if ready_servers:
-                    # Load balancing heuristic: Pick server with lowest active load
-                    ready_servers.sort(key=lambda s: s.active_request_count)
-                    chosen_server = ready_servers[0]
-                    req = self.request_queue.popleft()
-                    self.metrics.current_queue_depth = len(self.request_queue)
-
-                    # Launch request execution process on chosen server
-                    self.env.process(self._execute_request(chosen_server, req))
+            self._try_dispatch()
 
             if self.policy:
                 self.policy.on_tick(now)
 
-            yield self.env.timeout(0.05)  # 50ms dispatch resolution
+            yield self.env.timeout(0.1)  # 100ms periodic resolution
 
     def _execute_request(self, server: Server, req: dict):
-        yield self.env.process(server.serve_request(req["service_time"]))
+        """Executes request directly on server generator without nested sub-process overhead."""
+        yield from server.serve_request(req["service_time"])
         self.metrics.total_requests_served += 1
         if self.policy:
             self.policy.on_completion(server, req)
+        # Immediately dispatch queued items to newly available capacity
+        self._try_dispatch()
 
     def _telemetry_loop(self):
-        """Periodically samples system metrics for live graph rendering."""
+        """Periodically samples system metrics for full-timeline graph rendering."""
         while True:
-            yield self.env.timeout(0.5)  # Sample every 0.5 simulated seconds
+            yield self.env.timeout(1.0)  # Sample every 1.0 simulated second
             rate = self.workload.get_current_arrival_rate(self.env.now)
             self.metrics.record_sample(self.env.now, self.servers, rate)
 
@@ -175,5 +202,5 @@ class SimulationEngine:
             self.env.run(until=target_time)
 
     def clean_packet_animations(self, current_real_time: float):
-        """Prunes finished visual packet animations."""
-        self.flying_packets = [p for p in self.flying_packets if not p.is_finished(current_real_time)]
+        """Compatibility no-op (SimulationView manages active visual packets)."""
+        pass
