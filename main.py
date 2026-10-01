@@ -158,19 +158,13 @@ def main():
 
     def on_start_run(duration_minutes: float):
         nonlocal is_running, is_paused, target_sim_stop_time
+        # Every new run starts from a clean slate.
+        reset_simulation()
         is_running = True
         is_paused = False
         target_sim_stop_time = sim.env.now + duration_minutes * 60.0
         controls_view.set_run_state(is_running=True, is_paused=False,
                                     is_completed=False, target_stop_time=target_sim_stop_time)
-
-    def on_start_new_run():
-        """Main Start button: always resets first, then runs the configured duration."""
-        reset_simulation()
-        duration = settings_modal.run_duration_min
-        if duration <= 0:
-            duration = 60.0
-        on_start_run(duration)
 
     def on_backend_change(name: str):
         """Settings backend radio: swaps engine immediately (fresh state)."""
@@ -220,8 +214,16 @@ def main():
     def on_server_count_change(new_count: int):
         sim.set_num_servers(new_count)
 
+    run_modal = SettingsModal(
+        (screen_width, screen_height), config, fonts,
+        mode="run",
+        on_server_count_change=on_server_count_change,
+        on_start_run=on_start_run
+    )
+
     settings_modal = SettingsModal(
         (screen_width, screen_height), config, fonts,
+        mode="settings",
         on_server_count_change=on_server_count_change,
         backend=backend_pref,
         rust_available=rust_available(),
@@ -240,7 +242,7 @@ def main():
         on_abrupt_drop=on_abrupt_drop,
         on_flash_crowd=on_flash_crowd,
         on_traffic_volume=on_traffic_volume,
-        on_start_request=on_start_new_run,
+        on_start_request=run_modal.open,
         assets=assets,
         max_speed=max_speed
     )
@@ -287,7 +289,10 @@ def main():
                 running = False
                 break
 
-            # Modal handles events first if open
+            # Modals handle events first if open (run setup takes precedence)
+            if run_modal.is_open:
+                if run_modal.handle_event(event):
+                    continue
             if settings_modal.is_open:
                 if settings_modal.handle_event(event):
                     continue
@@ -319,6 +324,8 @@ def main():
                 elif event.key in (pygame.K_x, pygame.K_ESCAPE):
                     if graphs_view.is_visible:
                         graphs_view.set_visible(False)
+                    elif run_modal.is_open:
+                        run_modal.close()
                     elif settings_modal.is_open:
                         settings_modal.close()
 
@@ -358,7 +365,8 @@ def main():
         # Draw top menu bar across the header
         menu_bar.draw(screen)
 
-        # Draw modal settings overlay on top if open
+        # Draw modal overlays on top if open
+        run_modal.draw(screen)
         settings_modal.draw(screen)
 
         pygame.display.flip()
