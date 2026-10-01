@@ -3,8 +3,35 @@ Interactive UI Widgets for Pygame Control Room.
 Styled with the minimalist Dark Theme (#212121) aesthetic.
 """
 
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 import pygame
+
+
+# -------------------------------------------------------------------------
+# Shared font-render cache.
+# font.render() rasterizes glyphs on the CPU every call; view draw methods
+# run at 60 FPS, so identical (font, text, color) triples are memoized here.
+# Call sites are behavior-identical: same Surface content, far fewer raster ops.
+# -------------------------------------------------------------------------
+_render_cache: Dict[Tuple[int, str, Tuple[int, int, int]], pygame.Surface] = {}
+_RENDER_CACHE_MAX = 1024
+
+
+def render_cached(font: pygame.font.Font, text: str, color: tuple) -> pygame.Surface:
+    """Returns a cached raster of font.render(text, True, color)."""
+    key = (id(font), text, tuple(color))
+    surf = _render_cache.get(key)
+    if surf is None:
+        surf = font.render(text, True, tuple(color))
+        if len(_render_cache) >= _RENDER_CACHE_MAX:
+            _render_cache.clear()
+        _render_cache[key] = surf
+    return surf
+
+
+def clear_render_cache() -> None:
+    """Drops all cached text surfaces (e.g. after a font reload)."""
+    _render_cache.clear()
 
 
 class Button:
@@ -58,7 +85,7 @@ class Button:
         if self.icon:
             if self.text:
                 iw = self.icon.get_width()
-                text_surf = self.font.render(self.text, True, txt_col)
+                text_surf = render_cached(self.font, self.text, txt_col)
                 tw = text_surf.get_width()
                 total_w = iw + 6 + tw
                 start_x = self.rect.centerx - total_w // 2
@@ -67,7 +94,7 @@ class Button:
             else:
                 surface.blit(self.icon, self.icon.get_rect(center=self.rect.center))
         else:
-            text_surf = self.font.render(self.text, True, txt_col)
+            text_surf = render_cached(self.font, self.text, txt_col)
             text_rect = text_surf.get_rect(center=self.rect.center)
             surface.blit(text_surf, text_rect)
 
@@ -126,7 +153,7 @@ class ToggleSwitch:
         return False
 
     def draw(self, surface: pygame.Surface):
-        label_surf = self.font.render(self.label, True, (220, 225, 235))
+        label_surf = render_cached(self.font, self.label, (220, 225, 235))
         surface.blit(label_surf, (self.rect.x, self.rect.y + 4))
 
         pill_w, pill_h = 42, 22
@@ -191,7 +218,7 @@ class Slider:
     def draw(self, surface: pygame.Surface):
         if self.label:
             val_str = f"{int(self.value)}" if self.integer_only else f"{self.value:.1f}"
-            lbl_surf = self.font.render(f"{self.label}: {val_str}{self.unit}", True, (180, 185, 195))
+            lbl_surf = render_cached(self.font, f"{self.label}: {val_str}{self.unit}", (180, 185, 195))
             surface.blit(lbl_surf, (self.rect.x, self.rect.y - 18))
 
         track_y = self.rect.centery
@@ -261,13 +288,13 @@ class NumberStepper:
 
     def draw(self, surface: pygame.Surface):
         if self.label:
-            lbl_surf = self.font.render(self.label, True, (180, 185, 195))
+            lbl_surf = render_cached(self.font, self.label, (180, 185, 195))
             surface.blit(lbl_surf, (self.rect.x, self.rect.centery - lbl_surf.get_height() // 2))
 
         # Centered value display
         pygame.draw.rect(surface, (30, 30, 36), self.val_rect, border_radius=4)
         pygame.draw.rect(surface, (55, 55, 65), self.val_rect, width=1, border_radius=4)
-        val_surf = self.font.render(f"{self.value}{self.unit}", True, (240, 240, 250))
+        val_surf = render_cached(self.font, f"{self.value}{self.unit}", (240, 240, 250))
         surface.blit(val_surf, val_surf.get_rect(center=self.val_rect.center))
 
         self.dec_btn.draw(surface)
@@ -355,8 +382,9 @@ class DurationInputs:
 
     def draw(self, surface: pygame.Surface):
         # Section title
-        title_surf = self.fonts["normal"].render(
-            "Target Run Duration (defaults to 0 if blank):", True, (215, 220, 230)
+        title_surf = render_cached(
+            self.fonts["normal"],
+            "Target Run Duration (defaults to 0 if blank):", (215, 220, 230)
         )
         surface.blit(title_surf, (self.rect.x, self.rect.y))
 
@@ -375,9 +403,9 @@ class DurationInputs:
 
             val_str = self.values[i]
             if val_str:
-                txt_surf = self.fonts["normal_bold"].render(val_str, True, (245, 245, 250))
+                txt_surf = render_cached(self.fonts["normal_bold"], val_str, (245, 245, 250))
             else:
-                txt_surf = self.fonts["normal"].render("0", True, (90, 95, 105))
+                txt_surf = render_cached(self.fonts["normal"], "0", (90, 95, 105))
 
             txt_rect = txt_surf.get_rect(center=r.center)
             surface.blit(txt_surf, txt_rect)
@@ -386,14 +414,15 @@ class DurationInputs:
                 cursor_x = txt_rect.right + 2
                 pygame.draw.line(surface, (138, 180, 248), (cursor_x, r.y + 6), (cursor_x, r.bottom - 6), 2)
 
-            lbl_surf = self.fonts["small"].render(lbl, True, (160, 165, 175))
+            lbl_surf = render_cached(self.fonts["small"], lbl, (160, 165, 175))
             surface.blit(lbl_surf, (r.centerx - lbl_surf.get_width() // 2, r.bottom + 4))
 
         # Live summary text
         total_m = self.get_total_minutes()
         total_hours = total_m / 60.0
         summary_str = f"= Total: {total_m:,.0f} simulated minutes ({total_hours:,.1f} hours)"
-        summary_surf = self.fonts["mono"].render(
-            summary_str, True, (129, 201, 149) if total_m > 0 else (140, 140, 150)
+        summary_surf = render_cached(
+            self.fonts["mono"],
+            summary_str, (129, 201, 149) if total_m > 0 else (140, 140, 150)
         )
         surface.blit(summary_surf, (self.rect.x, self.rect.y + 78))
