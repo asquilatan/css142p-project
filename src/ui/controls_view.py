@@ -19,10 +19,16 @@ class ControlsView:
                  on_diurnal_toggle: Callable,
                  on_abrupt_drop: Callable,
                  on_flash_crowd: Callable,
-                 on_traffic_volume: Callable):
+                 on_traffic_volume: Callable,
+                 on_start_request: Optional[Callable] = None):
         self.layout = layout
         self.fonts = fonts
-        self.is_paused = False
+        self.is_running = False
+        self.is_paused = True
+        self.is_completed = False
+        self.target_stop_time: Optional[float] = None
+        self.on_start_request = on_start_request
+        self.on_play_pause = on_play_pause
 
         panel = self.layout.right_panel_rect
         px = panel.x + 16
@@ -39,17 +45,16 @@ class ControlsView:
             border_color=(55, 55, 65)
         )
 
-        # 2. Large Play/Pause button
+        # 2. Large Main Start / Pause button
         self.play_pause_btn = Button(
             pygame.Rect(px, panel.y + 44, pw, 44),
-            text="|| Pause",
+            text="▶ Start Simulation",
             font=fonts["header_large"],
-            callback=self._toggle_play_pause,
-            inactive_bg=(44, 44, 52),
-            inactive_text=(240, 240, 245),
-            border_color=(65, 65, 75)
+            callback=self._handle_main_button,
+            inactive_bg=(40, 95, 60),
+            inactive_text=(255, 255, 255),
+            border_color=(76, 175, 80)
         )
-        self.on_play_pause = on_play_pause
 
         # 3. Speed slider (1 to 50 simulated minutes per real second)
         self.speed_slider = Slider(
@@ -121,10 +126,39 @@ class ControlsView:
             on_change=on_traffic_volume
         )
 
-    def _toggle_play_pause(self):
-        self.is_paused = not self.is_paused
-        self.play_pause_btn.text = "> Resume" if self.is_paused else "|| Pause"
-        self.on_play_pause(self.is_paused)
+    def _handle_main_button(self):
+        if not self.is_running or self.is_completed:
+            if self.on_start_request:
+                self.on_start_request()
+        else:
+            self.is_paused = not self.is_paused
+            self.update_button_visuals()
+            self.on_play_pause(self.is_paused)
+
+    def set_run_state(self, is_running: bool, is_paused: bool, is_completed: bool = False,
+                      target_stop_time: Optional[float] = None):
+        self.is_running = is_running
+        self.is_paused = is_paused
+        self.is_completed = is_completed
+        self.target_stop_time = target_stop_time
+        self.update_button_visuals()
+
+    def update_button_visuals(self):
+        if not self.is_running or self.is_completed:
+            self.play_pause_btn.text = "▶ Start Simulation" if not self.is_completed else "▶ Start New Run"
+            self.play_pause_btn.inactive_bg = (40, 95, 60)
+            self.play_pause_btn.inactive_text = (255, 255, 255)
+            self.play_pause_btn.border_color = (76, 175, 80)
+        elif self.is_paused:
+            self.play_pause_btn.text = "> Resume"
+            self.play_pause_btn.inactive_bg = (48, 48, 56)
+            self.play_pause_btn.inactive_text = (240, 240, 245)
+            self.play_pause_btn.border_color = (75, 75, 88)
+        else:
+            self.play_pause_btn.text = "|| Pause"
+            self.play_pause_btn.inactive_bg = (44, 44, 52)
+            self.play_pause_btn.inactive_text = (240, 240, 245)
+            self.play_pause_btn.border_color = (65, 65, 75)
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if not self.layout.show_controls:
@@ -216,7 +250,19 @@ class ControlsView:
         surface.blit(phase_surf, (panel.right - phase_surf.get_width() - 16, clock_box_y + 16))
 
         elapsed_hours = sim_time_seconds / 3600.0
-        status_suffix = " (PAUSED)" if self.is_paused else ""
-        elapsed_str = f"t = {elapsed_hours:.1f} hours{status_suffix}"
+        if self.is_completed:
+            status_suffix = " (COMPLETED)"
+        elif not self.is_running:
+            status_suffix = " (READY)"
+        elif self.is_paused:
+            status_suffix = " (PAUSED)"
+        else:
+            status_suffix = " (RUNNING)"
+
+        if self.target_stop_time is not None:
+            target_hours = self.target_stop_time / 3600.0
+            elapsed_str = f"t = {elapsed_hours:.2f}h / {target_hours:.2f}h{status_suffix}"
+        else:
+            elapsed_str = f"t = {elapsed_hours:.1f} hours{status_suffix}"
         elapsed_surf = self.fonts["small"].render(elapsed_str, True, (130, 135, 145))
         surface.blit(elapsed_surf, (panel.x + 16, clock_box_y + 44))
