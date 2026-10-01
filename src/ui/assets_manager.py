@@ -25,6 +25,15 @@ class AssetsManager:
             "load_balancer",
             "cloud",
             "packet",
+            "icon_menu",
+            "icon_play",
+            "icon_pause",
+            "icon_reset",
+            "icon_drop",
+            "icon_surge",
+            "icon_graphs",
+            "icon_settings",
+            "icon_close",
         ]
 
         for key in asset_keys:
@@ -57,11 +66,45 @@ class AssetsManager:
             return self._draw_cloud_fallback()
         elif key == "packet":
             return self._draw_packet_fallback()
+        elif key.startswith("icon_"):
+            return self._create_icon_fallback(key)
 
         surf = pygame.Surface((64, 64), pygame.SRCALPHA)
         surf.fill((36, 36, 42))
         pygame.draw.rect(surf, (65, 65, 75), (0, 0, 64, 64), 1)
         return surf
+
+    def _create_icon_fallback(self, key: str) -> pygame.Surface:
+        surf = pygame.Surface((16, 16), pygame.SRCALPHA)
+        col = (220, 225, 235)
+        if key == "icon_menu":
+            pygame.draw.line(surf, col, (2, 4), (14, 4), 2)
+            pygame.draw.line(surf, col, (2, 8), (14, 8), 2)
+            pygame.draw.line(surf, col, (2, 12), (14, 12), 2)
+        elif key == "icon_play":
+            pygame.draw.polygon(surf, (129, 201, 149), [(4, 2), (13, 8), (4, 14)])
+        elif key == "icon_pause":
+            pygame.draw.line(surf, (240, 240, 245), (5, 3), (5, 13), 2)
+            pygame.draw.line(surf, (240, 240, 245), (11, 3), (11, 13), 2)
+        elif key == "icon_reset":
+            pygame.draw.arc(surf, (180, 185, 195), (2, 2, 12, 12), 0.5, 5.5, 2)
+            pygame.draw.polygon(surf, (180, 185, 195), [(10, 2), (14, 5), (10, 8)])
+        elif key == "icon_drop":
+            pygame.draw.polygon(surf, (242, 139, 130), [(3, 4), (13, 4), (8, 12)])
+        elif key == "icon_surge":
+            pygame.draw.polygon(surf, (253, 214, 99), [(9, 1), (4, 8), (8, 8), (7, 15), (12, 7), (8, 7)])
+        elif key == "icon_graphs":
+            pygame.draw.lines(surf, (138, 180, 248), False, [(2, 12), (6, 5), (10, 9), (14, 3)], 2)
+        elif key == "icon_settings":
+            pygame.draw.rect(surf, (180, 185, 195), (4, 4, 8, 8), 1)
+            pygame.draw.circle(surf, (180, 185, 195), (8, 8), 2)
+        elif key == "icon_close":
+            pygame.draw.line(surf, (200, 200, 210), (3, 3), (13, 13), 2)
+            pygame.draw.line(surf, (200, 200, 210), (13, 3), (3, 13), 2)
+        return surf
+
+    def get_icon(self, key: str) -> Optional[pygame.Surface]:
+        return self.images.get(key)
 
     def _draw_server_fallback(self, key: str) -> pygame.Surface:
         # Plain square for server node
