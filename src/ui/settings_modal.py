@@ -7,7 +7,7 @@ discrete server pool size (NumberStepper), and hardware/cost parameters.
 from typing import Callable, Optional
 import pygame
 from src.config import SimConfig
-from src.ui.widgets import Button, Slider, NumberStepper
+from src.ui.widgets import Button, Slider, NumberStepper, DurationInputs
 
 
 class SettingsModal:
@@ -21,14 +21,14 @@ class SettingsModal:
         self.on_start_run = on_start_run
         self.is_open = False
 
-        self.run_duration_min = 60.0  # Default 60 simulated minutes (1.0 hour)
+        self.run_duration_min = 60.0  # Default 60 simulated minutes
 
-        self.mw, self.mh = 560, 560
+        self.mw, self.mh = 560, 580
         self.rect = pygame.Rect((self.sw - self.mw) // 2, (self.sh - self.mh) // 2, self.mw, self.mh)
 
         self.close_btn = Button(
             pygame.Rect(self.rect.right - 80, self.rect.y + 14, 66, 26),
-            text="Close",
+            text="✕ Close",
             font=fonts["small"],
             callback=self.close,
             inactive_bg=(40, 40, 48),
@@ -41,31 +41,17 @@ class SettingsModal:
         y_cursor = self.rect.y + 60
 
         # ---------------------------------------------------------------------
-        # 1. Target Run Duration (Presets + Slider)
+        # 1. Target Run Duration (4 Numeric Input Boxes: months, days, hours, minutes)
         # ---------------------------------------------------------------------
-        self.duration_slider = Slider(
-            pygame.Rect(sx, y_cursor + 24, sw, 18),
-            min_val=5.0, max_val=1440.0, initial_val=self.run_duration_min,
-            font=fonts["small"], label="Run Duration", unit=" min", integer_only=True,
-            on_change=lambda v: setattr(self, "run_duration_min", float(v))
+        self.duration_inputs = DurationInputs(
+            pygame.Rect(sx, y_cursor, sw, 100),
+            fonts=fonts,
+            initial_hours=1,
+            initial_minutes=0,
+            on_change=lambda m: setattr(self, "run_duration_min", m)
         )
 
-        preset_configs = [("15m", 15.0), ("30m", 30.0), ("1h", 60.0), ("2h", 120.0), ("4h", 240.0), ("24h", 1440.0)]
-        self.preset_btns = []
-        pb_w = (sw - 25) // len(preset_configs)
-        for i, (txt, val) in enumerate(preset_configs):
-            btn = Button(
-                pygame.Rect(sx + i * (pb_w + 5), y_cursor + 48, pb_w, 22),
-                text=txt,
-                font=fonts["small"],
-                callback=lambda v=val: self._set_duration(v),
-                inactive_bg=(36, 36, 44),
-                inactive_text=(200, 205, 215),
-                border_color=(60, 60, 72)
-            )
-            self.preset_btns.append(btn)
-
-        y_cursor += 84
+        y_cursor += 105
 
         # ---------------------------------------------------------------------
         # 2. Server Pool Size (Discrete Integer Stepper 3 to 10)
@@ -78,7 +64,7 @@ class SettingsModal:
         )
 
         y_cursor += 42
-        spacing = 46
+        spacing = 44
 
         # ---------------------------------------------------------------------
         # 3. Hardware & Economic Tuning
@@ -119,7 +105,6 @@ class SettingsModal:
         )
 
         self.sliders = [
-            self.duration_slider,
             self.rate_slider,
             self.sla_slider,
             self.boot_slider,
@@ -131,7 +116,7 @@ class SettingsModal:
         # 4. Big Action Button (Bottom)
         # ---------------------------------------------------------------------
         self.start_btn = Button(
-            pygame.Rect(sx, self.rect.bottom - 50, sw, 36),
+            pygame.Rect(sx, self.rect.bottom - 48, sw, 36),
             text="▶ Start Simulation Run",
             font=fonts["normal_bold"],
             callback=self._start_run,
@@ -140,11 +125,12 @@ class SettingsModal:
             border_color=(76, 175, 80)
         )
 
-    def _set_duration(self, minutes: float):
-        self.run_duration_min = minutes
-        self.duration_slider.value = minutes
-
     def _start_run(self):
+        total_m = self.duration_inputs.get_total_minutes()
+        # If blank/0, default to 60 minutes
+        if total_m <= 0:
+            total_m = 60.0
+        self.run_duration_min = total_m
         if self.on_start_run:
             self.on_start_run(self.run_duration_min)
         self.close()
@@ -163,12 +149,10 @@ class SettingsModal:
             return True
         if self.start_btn.handle_event(event):
             return True
+        if self.duration_inputs.handle_event(event):
+            return True
         if self.server_stepper.handle_event(event):
             return True
-
-        for p_btn in self.preset_btns:
-            if p_btn.handle_event(event):
-                return True
 
         for s in self.sliders:
             if s.handle_event(event):
@@ -202,20 +186,18 @@ class SettingsModal:
         pygame.draw.line(surface, (45, 45, 55), (self.rect.x + 20, self.rect.y + 48),
                          (self.rect.right - 20, self.rect.y + 48), 1)
 
-        # Draw Duration
-        self.duration_slider.draw(surface)
-        for p_btn in self.preset_btns:
-            p_btn.draw(surface)
+        # Draw Duration Inputs
+        self.duration_inputs.draw(surface)
 
         # Draw Server Stepper
         self.server_stepper.draw(surface)
 
         # Draw Hardware Sliders
-        for s in self.sliders[1:]:
+        for s in self.sliders:
             s.draw(surface)
 
         # Divider above start button
-        pygame.draw.line(surface, (45, 45, 55), (self.rect.x + 20, self.rect.bottom - 62),
-                         (self.rect.right - 20, self.rect.bottom - 62), 1)
+        pygame.draw.line(surface, (45, 45, 55), (self.rect.x + 20, self.rect.bottom - 60),
+                         (self.rect.right - 20, self.rect.bottom - 60), 1)
 
         self.start_btn.draw(surface)
