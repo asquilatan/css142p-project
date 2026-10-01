@@ -9,7 +9,8 @@ import sys
 import time
 import pygame
 from src.config import SimConfig
-from src.engine_bridge import create_engine
+from src.engine_bridge import create_engine, rust_available
+from src.simulation import SimulationEngine
 from src.policies import AlwaysOnPolicy, ThresholdPolicy, ScheduledPolicy, SleepBufferPolicy
 from src.ui.layout import Layout
 from src.ui.assets_manager import AssetsManager
@@ -70,18 +71,36 @@ def main():
     clock = pygame.time.Clock()
     fonts = init_fonts()
 
-    # Core Configuration & Simulation Engine (Rust-accelerated when available)
+    # Core Configuration & Simulation Engine.
+    # Backend preference: Rust accelerator when present, explicit PySim when
+    # chosen in Settings. Ultra speed (up to 1440 min/s = 1 day/sec) is a
+    # separate Rust-only unlock.
     config = SimConfig(num_servers=5)
-    sim = create_engine(config)
-    pygame.display.set_caption(
-        "Data Center Server Provisioning — Control Room"
-        + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
-    )
+    backend_pref = "rust" if rust_available() else "pysim"
+    ultra_enabled = False
 
-    # Speed ceiling follows the active backend: the Rust core sustains ~500
-    # min/s before frames suffer, while SimPy drops frames past ~25 min/s —
-    # so the fallback UI is hard-capped at the historic 50.
-    max_speed = 500.0 if sim.is_rust_accelerated else 50.0
+    def make_engine():
+        if backend_pref == "pysim":
+            return SimulationEngine(config)
+        return create_engine(config)
+
+    sim = make_engine()
+
+    def compute_max_speed() -> float:
+        if ultra_enabled and sim.is_rust_accelerated:
+            return 1440.0
+        return 500.0 if sim.is_rust_accelerated else 50.0
+
+    def refresh_chrome():
+        pygame.display.set_caption(
+            "Data Center Server Provisioning — Control Room"
+            + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
+        )
+
+    refresh_chrome()
+
+    # Speed ceiling follows backend + ultra unlock (see compute_max_speed).
+    max_speed = compute_max_speed()
 
     # Initial Provisioning Policy (Threshold-based)
     current_policy = ThresholdPolicy()
@@ -116,13 +135,10 @@ def main():
         controls_view.set_run_state(is_running=is_running, is_paused=is_paused,
                                    is_completed=False, target_stop_time=target_sim_stop_time)
 
-    def on_reset():
+    def reset_simulation():
+        """Rebuilds a fresh engine + policy; used by Reset and backend switches."""
         nonlocal sim, current_policy, is_running, is_paused, target_sim_stop_time
-        sim = create_engine(config)
-        pygame.display.set_caption(
-            "Data Center Server Provisioning — Control Room"
-            + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
-        )
+        sim = make_engine()
         policy_class = type(current_policy)
         current_policy = policy_class()
         sim.set_policy(current_policy)
@@ -130,8 +146,13 @@ def main():
         is_running = False
         is_paused = True
         target_sim_stop_time = None
+        refresh_chrome()
         controls_view.set_run_state(is_running=False, is_paused=True,
-                                   is_completed=False, target_stop_time=None)
+                                    is_completed=False, target_stop_time=None)
+
+    def on_reset():
+        reset_simulation()
+        controls_view.set_max_speed(compute_max_speed())
 
     def on_start_run(duration_minutes: float):
         nonlocal is_running, is_paused, target_sim_stop_time
@@ -139,7 +160,32 @@ def main():
         is_paused = False
         target_sim_stop_time = sim.env.now + duration_minutes * 60.0
         controls_view.set_run_state(is_running=True, is_paused=False,
-                                   is_completed=False, target_stop_time=target_sim_stop_time)
+                                    is_completed=False, target_stop_time=target_sim_stop_time)
+
+    def on_start_new_run():
+        """Main Start button: always resets first, then runs the configured duration."""
+        reset_simulation()
+        duration = settings_modal.run_duration_min
+        if duration <= 0:
+            duration = 60.0
+        on_start_run(duration)
+
+    def on_backend_change(name: str):
+        """Settings backend radio: swaps engine immediately (fresh state)."""
+        nonlocal backend_pref, max_speed
+        if name == "rust" and not rust_available():
+            return
+        backend_pref = name
+        reset_simulation()
+        max_speed = compute_max_speed()
+        controls_view.set_max_speed(max_speed)
+
+    def on_ultra_toggle(enabled: bool):
+        """Settings ultra-speed switch: raises the cap to 1440 on Rust only."""
+        nonlocal ultra_enabled, max_speed
+        ultra_enabled = enabled
+        max_speed = compute_max_speed()
+        controls_view.set_max_speed(max_speed)
 
     def on_speed_change(multiplier: float):
         nonlocal sim_speed
@@ -175,7 +221,11 @@ def main():
     settings_modal = SettingsModal(
         (screen_width, screen_height), config, fonts,
         on_server_count_change=on_server_count_change,
-        on_start_run=on_start_run
+        backend=backend_pref,
+        rust_available=rust_available(),
+        ultra_enabled=ultra_enabled,
+        on_backend_change=on_backend_change,
+        on_ultra_toggle=on_ultra_toggle
     )
 
     controls_view = ControlsView(
@@ -188,7 +238,7 @@ def main():
         on_abrupt_drop=on_abrupt_drop,
         on_flash_crowd=on_flash_crowd,
         on_traffic_volume=on_traffic_volume,
-        on_start_request=settings_modal.open,
+        on_start_request=on_start_new_run,
         assets=assets,
         max_speed=max_speed
     )
