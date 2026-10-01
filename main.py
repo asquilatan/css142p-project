@@ -104,6 +104,7 @@ def main():
         policy_class = type(current_policy)
         current_policy = policy_class()
         sim.set_policy(current_policy)
+        simulation_view.active_packets.clear()
 
     def on_speed_change(multiplier: float):
         nonlocal sim_speed
@@ -230,7 +231,7 @@ def main():
         screen.fill(config.bg_color)
 
         # Draw center canvas simulation topology (hardware clipped to center column)
-        simulation_view.update_and_draw(screen, sim, current_real_time)
+        simulation_view.update_and_draw(screen, sim, current_real_time, dt, is_paused)
 
         # Draw Picture-in-Picture live graphs if active
         graphs_view.draw(screen, sim.metrics)
