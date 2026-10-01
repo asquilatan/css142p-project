@@ -1,6 +1,6 @@
 """
 Interactive UI Widgets for Pygame Control Room.
-Implements buttons, radio groups, toggle switches, and sliders matching the sketch aesthetic.
+Styled with the minimalist Dark Theme (#212121) aesthetic.
 """
 
 from typing import Callable, List, Optional
@@ -10,9 +10,9 @@ import pygame
 class Button:
     def __init__(self, rect: pygame.Rect, text: str, font: pygame.font.Font,
                  callback: Optional[Callable] = None, is_toggle: bool = False,
-                 active_bg: tuple = (30, 30, 35), active_text: tuple = (255, 255, 255),
-                 inactive_bg: tuple = (255, 255, 255), inactive_text: tuple = (30, 30, 35),
-                 border_color: tuple = (30, 30, 35)):
+                 active_bg: tuple = (138, 180, 248), active_text: tuple = (20, 20, 25),
+                 inactive_bg: tuple = (40, 40, 46), inactive_text: tuple = (225, 225, 230),
+                 border_color: tuple = (60, 60, 70)):
         self.rect = pygame.Rect(rect)
         self.text = text
         self.font = font
@@ -40,22 +40,19 @@ class Button:
         return False
 
     def draw(self, surface: pygame.Surface):
-        # Choose background color
         if self.is_active:
             bg = self.active_bg
             txt_col = self.active_text
         elif self.is_hovered:
-            bg = (235, 238, 245)
-            txt_col = self.inactive_text
+            bg = (52, 52, 60)
+            txt_col = (255, 255, 255)
         else:
             bg = self.inactive_bg
             txt_col = self.inactive_text
 
-        # Draw box and border
-        pygame.draw.rect(surface, bg, self.rect, border_radius=4)
-        pygame.draw.rect(surface, self.border_color, self.rect, width=2, border_radius=4)
+        pygame.draw.rect(surface, bg, self.rect, border_radius=5)
+        pygame.draw.rect(surface, self.border_color, self.rect, width=1, border_radius=5)
 
-        # Draw centered text
         text_surf = self.font.render(self.text, True, txt_col)
         text_rect = text_surf.get_rect(center=self.rect.center)
         surface.blit(text_surf, text_rect)
@@ -115,26 +112,22 @@ class ToggleSwitch:
         return False
 
     def draw(self, surface: pygame.Surface):
-        # Render label
-        label_surf = self.font.render(self.label, True, (30, 30, 35))
+        label_surf = self.font.render(self.label, True, (220, 225, 235))
         surface.blit(label_surf, (self.rect.x, self.rect.y + 4))
 
-        # Switch pill button on the right
-        pill_w, pill_h = 44, 22
+        pill_w, pill_h = 42, 22
         pill_x = self.rect.right - pill_w
         pill_y = self.rect.y + (self.rect.height - pill_h) // 2
         pill_rect = pygame.Rect(pill_x, pill_y, pill_w, pill_h)
 
-        bg_col = (46, 204, 113) if self.is_on else (200, 205, 215)
+        bg_col = (129, 201, 149) if self.is_on else (55, 55, 62)
         pygame.draw.rect(surface, bg_col, pill_rect, border_radius=11)
-        pygame.draw.rect(surface, (30, 30, 35), pill_rect, width=2, border_radius=11)
+        pygame.draw.rect(surface, (70, 70, 80), pill_rect, width=1, border_radius=11)
 
-        # Sliding circular knob
-        knob_r = 8
+        knob_r = 7
         knob_cx = pill_x + pill_w - 11 if self.is_on else pill_x + 11
         knob_cy = pill_y + 11
         pygame.draw.circle(surface, (255, 255, 255), (knob_cx, knob_cy), knob_r)
-        pygame.draw.circle(surface, (30, 30, 35), (knob_cx, knob_cy), knob_r, 2)
 
 
 class Slider:
@@ -167,8 +160,8 @@ class Slider:
         return False
 
     def _update_val(self, mouse_x: int):
-        track_start = self.rect.x + 10
-        track_end = self.rect.right - 10
+        track_start = self.rect.x + 8
+        track_end = self.rect.right - 8
         clamped_x = min(track_end, max(track_start, mouse_x))
         fraction = (clamped_x - track_start) / max(1, track_end - track_start)
         self.value = self.min_val + fraction * (self.max_val - self.min_val)
@@ -176,19 +169,16 @@ class Slider:
             self.on_change(self.value)
 
     def draw(self, surface: pygame.Surface):
-        # Draw label if present
         if self.label:
-            lbl_surf = self.font.render(f"{self.label}: {self.value:.1f}x", True, (40, 45, 55))
+            lbl_surf = self.font.render(f"{self.label}: {self.value:.1f}x", True, (180, 185, 195))
             surface.blit(lbl_surf, (self.rect.x, self.rect.y - 18))
 
-        # Track line
         track_y = self.rect.centery
-        pygame.draw.line(surface, (180, 185, 195), (self.rect.x + 10, track_y), (self.rect.right - 10, track_y), 4)
+        pygame.draw.line(surface, (55, 55, 65), (self.rect.x + 8, track_y), (self.rect.right - 8, track_y), 3)
 
-        # Handle position
         fraction = (self.value - self.min_val) / max(0.001, self.max_val - self.min_val)
-        handle_x = int(self.rect.x + 10 + fraction * (self.rect.width - 20))
+        handle_x = int(self.rect.x + 8 + fraction * (self.rect.width - 16))
         handle_y = track_y
 
-        pygame.draw.circle(surface, (250, 250, 252), (handle_x, handle_y), 9)
-        pygame.draw.circle(surface, (30, 30, 35), (handle_x, handle_y), 9, 2)
+        pygame.draw.circle(surface, (138, 180, 248), (handle_x, handle_y), 8)
+        pygame.draw.circle(surface, (20, 20, 25), (handle_x, handle_y), 3)
