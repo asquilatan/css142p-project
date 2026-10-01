@@ -1,7 +1,7 @@
 """
 Controls View (Right Sidebar HUD).
 Implements the control panel with Play/Pause, Reset, Speed selector,
-Policy radio group, Workload triggers, Traffic slider, and 24-hour clock display matching the sketch.
+Policy radio group, Workload triggers, Traffic slider, and 24-hour clock display in minimalist dark aesthetic.
 """
 
 from typing import Callable, Optional
@@ -34,17 +34,21 @@ class ControlsView:
             pygame.Rect(panel.right - 64, panel.y + 12, 50, 24),
             text="Reset",
             font=fonts["small"],
-            callback=on_reset
+            callback=on_reset,
+            inactive_bg=(36, 36, 42),
+            inactive_text=(180, 185, 195),
+            border_color=(55, 55, 65)
         )
 
         # 2. Large Play/Pause button
         self.play_pause_btn = Button(
-            pygame.Rect(px, panel.y + 44, pw, 46),
+            pygame.Rect(px, panel.y + 44, pw, 44),
             text="|| Pause",
             font=fonts["header_large"],
             callback=self._toggle_play_pause,
-            active_bg=(245, 245, 248),
-            active_text=(30, 30, 35)
+            inactive_bg=(44, 44, 52),
+            inactive_text=(240, 240, 245),
+            border_color=(65, 65, 75)
         )
         self.on_play_pause = on_play_pause
 
@@ -52,7 +56,7 @@ class ControlsView:
         speed_labels = ["1x", "5x", "20x", "50x"]
         speed_btns = []
         bw = (pw - 12) // 4
-        sy = panel.y + 126
+        sy = panel.y + 124
         for i, s_lbl in enumerate(speed_labels):
             bx = px + i * (bw + 4)
             speed_btns.append(Button(
@@ -66,7 +70,7 @@ class ControlsView:
         # 4. Policy selector: [ Always-On | Threshold | Scheduled | Sleep-Buffer ]
         policy_labels = ["Always-On", "Threshold", "Scheduled", "Sleep-Buffer"]
         policy_btns = []
-        py_start = panel.y + 188
+        py_start = panel.y + 186
         for i, p_lbl in enumerate(policy_labels):
             col = i % 2
             row = i // 2
@@ -81,36 +85,34 @@ class ControlsView:
         self.policy_group = ButtonGroup(policy_btns, initial_index=1, on_change=on_policy_change)
 
         # 5. Workload triggers
-        # Diurnal Auto-Cycle flip switch
         self.diurnal_switch = ToggleSwitch(
-            pygame.Rect(px, panel.y + 280, pw, 26),
+            pygame.Rect(px, panel.y + 276, pw, 26),
             label="Diurnal Auto-Cycle",
             font=fonts["normal"],
             initial_state=True,
             on_toggle=on_diurnal_toggle
         )
 
-        # Abrupt Traffic Drop button
         self.abrupt_drop_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 316, 54, 24),
+            pygame.Rect(panel.right - 70, panel.y + 312, 54, 24),
             text="[ btn ]",
             font=fonts["small"],
             callback=on_abrupt_drop
         )
 
-        # Flash Crowd surge button
         self.flash_crowd_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 348, 54, 24),
+            pygame.Rect(panel.right - 70, panel.y + 344, 54, 24),
             text="[ btn ]",
             font=fonts["small"],
             callback=on_flash_crowd,
-            active_bg=(231, 76, 60),
-            active_text=(255, 255, 255)
+            inactive_bg=(48, 40, 42),
+            inactive_text=(242, 139, 130),
+            border_color=(120, 50, 50)
         )
 
         # 6. Traffic volume slider
         self.traffic_slider = Slider(
-            pygame.Rect(px, panel.y + 412, pw, 22),
+            pygame.Rect(px, panel.y + 406, pw, 20),
             min_val=0.2,
             max_val=3.0,
             initial_val=1.0,
@@ -121,7 +123,7 @@ class ControlsView:
 
         # 7. [ ⚙ Settings ] button
         self.settings_btn = Button(
-            pygame.Rect(px, panel.y + 460, pw, 28),
+            pygame.Rect(px, panel.y + 452, pw, 28),
             text="⚙ Hardware & Cost Settings",
             font=fonts["normal"],
             callback=on_open_settings
@@ -166,58 +168,50 @@ class ControlsView:
             return
 
         panel = self.layout.right_panel_rect
-        border_col = (25, 25, 30)
+        border_col = (48, 48, 54)
+        panel_bg = (24, 24, 26)
 
-        pygame.draw.rect(surface, (255, 255, 255), panel)
-        pygame.draw.rect(surface, border_col, panel, width=2)
+        pygame.draw.rect(surface, panel_bg, panel)
+        # 1px border divider on left
+        pygame.draw.line(surface, border_col, (panel.x, panel.y), (panel.x, panel.bottom), 1)
 
         # Header: Controls HUD & Reset
-        hud_title = self.fonts["header"].render("Controls HUD", True, border_col)
+        hud_title = self.fonts["header"].render("Controls HUD", True, (230, 230, 235))
         surface.blit(hud_title, (panel.x + 16, panel.y + 12))
         self.reset_btn.draw(surface)
 
-        # Big Play/Pause
         self.play_pause_btn.draw(surface)
 
-        # Speed Section Header
-        speed_lbl = self.fonts["normal"].render("Speed:", True, (50, 55, 65))
-        surface.blit(speed_lbl, (panel.x + 16, panel.y + 104))
+        speed_lbl = self.fonts["normal"].render("Speed:", True, (160, 165, 175))
+        surface.blit(speed_lbl, (panel.x + 16, panel.y + 102))
         self.speed_group.draw(surface)
 
-        # Policy Section Header
-        policy_lbl = self.fonts["normal"].render("Policy:", True, (50, 55, 65))
-        surface.blit(policy_lbl, (panel.x + 16, panel.y + 164))
+        policy_lbl = self.fonts["normal"].render("Policy:", True, (160, 165, 175))
+        surface.blit(policy_lbl, (panel.x + 16, panel.y + 162))
         self.policy_group.draw(surface)
 
-        # Workload Triggers
         self.diurnal_switch.draw(surface)
 
-        drop_lbl = self.fonts["normal"].render("Abrupt Traffic Drop", True, (40, 45, 55))
-        surface.blit(drop_lbl, (panel.x + 16, panel.y + 318))
+        drop_lbl = self.fonts["normal"].render("Abrupt Traffic Drop", True, (210, 215, 225))
+        surface.blit(drop_lbl, (panel.x + 16, panel.y + 314))
         self.abrupt_drop_btn.draw(surface)
 
-        flash_lbl = self.fonts["normal"].render("Flash Crowd", True, (40, 45, 55))
-        surface.blit(flash_lbl, (panel.x + 16, panel.y + 350))
+        flash_lbl = self.fonts["normal"].render("Flash Crowd", True, (210, 215, 225))
+        surface.blit(flash_lbl, (panel.x + 16, panel.y + 346))
         self.flash_crowd_btn.draw(surface)
 
-        # Traffic Volume Slider
         self.traffic_slider.draw(surface)
-
-        # Settings Button
         self.settings_btn.draw(surface)
 
-        # Bottom Clock & Elapsed Time
         self._draw_clock(surface, sim_time_seconds)
 
     def _draw_clock(self, surface: pygame.Surface, sim_time_seconds: float):
         panel = self.layout.right_panel_rect
-        border_col = (25, 25, 30)
+        border_col = (48, 48, 54)
 
-        # Dividing line above clock
         clock_box_y = panel.bottom - 74
-        pygame.draw.line(surface, border_col, (panel.x, clock_box_y), (panel.right, clock_box_y), 2)
+        pygame.draw.line(surface, border_col, (panel.x, clock_box_y), (panel.right, clock_box_y), 1)
 
-        # Calculate time of day (0:00 to 24:00)
         day_secs = sim_time_seconds % 86400.0
         hours = int(day_secs // 3600)
         minutes = int((day_secs % 3600) // 60)
@@ -227,17 +221,18 @@ class ControlsView:
             display_hour = 12
 
         time_str = f"{display_hour}:{minutes:02d} {am_pm}"
-        phase_str = "(PEAK)" if 9 <= hours <= 18 else "(OFF-PEAK)"
+        is_peak = (9 <= hours <= 18)
+        phase_str = "(PEAK)" if is_peak else "(OFF-PEAK)"
+        phase_color = (253, 214, 99) if is_peak else (150, 155, 165)
 
-        time_surf = self.fonts["large_bold"].render(time_str, True, border_col)
-        phase_surf = self.fonts["normal"].render(phase_str, True, (80, 85, 95))
+        time_surf = self.fonts["large_bold"].render(time_str, True, (245, 245, 250))
+        phase_surf = self.fonts["normal"].render(phase_str, True, phase_color)
 
         surface.blit(time_surf, (panel.x + 16, clock_box_y + 10))
         surface.blit(phase_surf, (panel.right - phase_surf.get_width() - 16, clock_box_y + 16))
 
-        # Elapsed hours and pause state
         elapsed_hours = sim_time_seconds / 3600.0
         status_suffix = " (PAUSED)" if self.is_paused else ""
         elapsed_str = f"t = {elapsed_hours:.1f} hours{status_suffix}"
-        elapsed_surf = self.fonts["small"].render(elapsed_str, True, (100, 105, 115))
+        elapsed_surf = self.fonts["small"].render(elapsed_str, True, (130, 135, 145))
         surface.blit(elapsed_surf, (panel.x + 16, clock_box_y + 44))
