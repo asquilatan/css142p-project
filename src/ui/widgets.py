@@ -189,3 +189,72 @@ class Slider:
 
         pygame.draw.circle(surface, (138, 180, 248), (handle_x, handle_y), 8)
         pygame.draw.circle(surface, (20, 20, 25), (handle_x, handle_y), 3)
+
+
+class NumberStepper:
+    """An integer number stepper with [-] and [+] buttons and clear integer display."""
+    def __init__(self, rect: pygame.Rect, min_val: int, max_val: int, initial_val: int,
+                 font: pygame.font.Font, label: str = "", unit: str = " Nodes",
+                 on_change: Optional[Callable[[int], None]] = None):
+        self.rect = pygame.Rect(rect)
+        self.min_val = int(min_val)
+        self.max_val = int(max_val)
+        self.value = int(initial_val)
+        self.font = font
+        self.label = label
+        self.unit = unit
+        self.on_change = on_change
+
+        btn_w = 30
+        self.dec_btn = Button(
+            pygame.Rect(self.rect.right - btn_w * 2 - 86, self.rect.y, btn_w, self.rect.height),
+            text="-",
+            font=font,
+            callback=self.decrement,
+            inactive_bg=(40, 40, 48),
+            inactive_text=(220, 220, 230),
+            border_color=(65, 65, 75)
+        )
+        self.val_rect = pygame.Rect(self.rect.right - btn_w - 82, self.rect.y, 78, self.rect.height)
+        self.inc_btn = Button(
+            pygame.Rect(self.rect.right - btn_w, self.rect.y, btn_w, self.rect.height),
+            text="+",
+            font=font,
+            callback=self.increment,
+            inactive_bg=(40, 40, 48),
+            inactive_text=(220, 220, 230),
+            border_color=(65, 65, 75)
+        )
+
+    def decrement(self):
+        if self.value > self.min_val:
+            self.value -= 1
+            if self.on_change:
+                self.on_change(self.value)
+
+    def increment(self):
+        if self.value < self.max_val:
+            self.value += 1
+            if self.on_change:
+                self.on_change(self.value)
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if self.dec_btn.handle_event(event):
+            return True
+        if self.inc_btn.handle_event(event):
+            return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        if self.label:
+            lbl_surf = self.font.render(self.label, True, (180, 185, 195))
+            surface.blit(lbl_surf, (self.rect.x, self.rect.centery - lbl_surf.get_height() // 2))
+
+        # Centered value display
+        pygame.draw.rect(surface, (30, 30, 36), self.val_rect, border_radius=4)
+        pygame.draw.rect(surface, (55, 55, 65), self.val_rect, width=1, border_radius=4)
+        val_surf = self.font.render(f"{self.value}{self.unit}", True, (240, 240, 250))
+        surface.blit(val_surf, val_surf.get_rect(center=self.val_rect.center))
+
+        self.dec_btn.draw(surface)
+        self.inc_btn.draw(surface)
