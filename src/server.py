@@ -163,17 +163,24 @@ class Server:
             return False
         return self.active_request_count < self.capacity
 
-    def serve_request(self, service_time: float):
-        """SimPy process that executes a request on this server node."""
+    def reserve_slot(self):
+        """Synchronously reserves a processing slot at dispatch time."""
         self._update_energy()
         self.active_request_count += 1
         self.state = ServerState.ACTIVE
 
+    def release_slot(self):
+        """Releases a processing slot upon request completion."""
+        self._update_energy()
+        self.active_request_count = max(0, self.active_request_count - 1)
+        self.total_served_count += 1
+        if self.active_request_count == 0:
+            self.state = ServerState.IDLE
+
+    def serve_request(self, service_time: float):
+        """SimPy process that executes a request on this server node."""
         try:
             yield self.env.timeout(service_time)
         finally:
-            self._update_energy()
-            self.active_request_count = max(0, self.active_request_count - 1)
-            self.total_served_count += 1
-            if self.active_request_count == 0:
-                self.state = ServerState.IDLE
+            self.release_slot()
+
