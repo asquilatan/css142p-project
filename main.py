@@ -94,10 +94,7 @@ def main():
         return 500.0 if sim.is_rust_accelerated else 50.0
 
     def refresh_chrome():
-        pygame.display.set_caption(
-            "Data Center Server Provisioning — Control Room"
-            + ("  [RUST ACCELERATED]" if sim.is_rust_accelerated else "  [SIMPY FALLBACK]")
-        )
+        pygame.display.set_caption("Data Center Server Provisioning — Control Room")
 
     refresh_chrome()
 
