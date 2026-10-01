@@ -4,6 +4,7 @@ Manages SimPy discrete events, the central Load Balancer,
 request queuing, packet animations, and policy decisions.
 """
 
+from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Optional
 import simpy
@@ -18,18 +19,19 @@ class PacketAnimation:
     packet_id: int
     start_pos: tuple
     end_pos: tuple
-    start_time: float
-    duration: float = 0.4  # seconds of visual travel
+    start_time: float = 0.0
+    duration: float = 0.35  # seconds of visual travel
     server_id: Optional[int] = None
     color: tuple = (30, 30, 40)
+    progress: float = 0.0
 
-    def get_progress(self, current_time: float) -> float:
+    def get_progress(self, current_time: float = 0.0) -> float:
         if self.duration <= 0:
             return 1.0
-        return min(1.0, max(0.0, (current_time - self.start_time) / self.duration))
+        return min(1.0, max(0.0, self.progress))
 
-    def is_finished(self, current_time: float) -> float:
-        return (current_time - self.start_time) >= self.duration
+    def is_finished(self, current_time: float = 0.0) -> bool:
+        return self.progress >= 1.0
 
 
 class SimulationEngine:
@@ -44,7 +46,7 @@ class SimulationEngine:
         self._init_servers(config.num_servers)
 
         # Incoming request queue
-        self.request_queue: List[dict] = []
+        self.request_queue: deque = deque()
         self.next_request_id = 1
 
         # Provisioning Policy (set externally)
@@ -121,18 +123,14 @@ class SimulationEngine:
         Load Balancer dispatch process:
         Examines incoming queue, checks timeouts, and routes requests to ready servers.
         """
+        timeout_limit = self.config.workload.request_timeout_sec
         while True:
             now = self.env.now
 
-            # Clean expired requests (SLA Timeout Drop)
-            timeout_limit = self.config.workload.request_timeout_sec
-            valid_queue = []
-            for r in self.request_queue:
-                if (now - r["arrival_time"]) > timeout_limit:
-                    self.metrics.total_requests_dropped += 1
-                else:
-                    valid_queue.append(r)
-            self.request_queue = valid_queue
+            # Clean expired requests from front of queue (SLA Timeout Drop)
+            while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
+                self.request_queue.popleft()
+                self.metrics.total_requests_dropped += 1
             self.metrics.current_queue_depth = len(self.request_queue)
 
             # Try to dispatch queued requests to ready servers (IDLE or ACTIVE with capacity)
@@ -143,7 +141,7 @@ class SimulationEngine:
                     # Load balancing heuristic: Pick server with lowest active load
                     ready_servers.sort(key=lambda s: s.active_request_count)
                     chosen_server = ready_servers[0]
-                    req = self.request_queue.pop(0)
+                    req = self.request_queue.popleft()
                     self.metrics.current_queue_depth = len(self.request_queue)
 
                     # Launch request execution process on chosen server
@@ -152,7 +150,7 @@ class SimulationEngine:
             if self.policy:
                 self.policy.on_tick(now)
 
-            yield self.env.timeout(0.01)  # 10ms dispatch resolution
+            yield self.env.timeout(0.05)  # 50ms dispatch resolution
 
     def _execute_request(self, server: Server, req: dict):
         yield self.env.process(server.serve_request(req["service_time"]))
