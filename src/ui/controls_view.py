@@ -1,6 +1,6 @@
 """
 Controls View (Right Sidebar HUD).
-Implements the control panel with Play/Pause, Reset, Speed selector,
+Implements the control panel with Play/Pause, Reset, Speed slider (1-50 min/sec),
 Policy radio group, Workload triggers, Traffic slider, and 24-hour clock display in minimalist dark aesthetic.
 """
 
@@ -19,8 +19,7 @@ class ControlsView:
                  on_diurnal_toggle: Callable,
                  on_abrupt_drop: Callable,
                  on_flash_crowd: Callable,
-                 on_traffic_volume: Callable,
-                 on_open_settings: Callable):
+                 on_traffic_volume: Callable):
         self.layout = layout
         self.fonts = fonts
         self.is_paused = False
@@ -52,25 +51,24 @@ class ControlsView:
         )
         self.on_play_pause = on_play_pause
 
-        # 3. Speed selector: [ 1x | 5x | 20x | 50x ]
-        speed_labels = ["1x", "5x", "20x", "50x"]
-        speed_btns = []
-        bw = (pw - 12) // 4
-        sy = panel.y + 124
-        for i, s_lbl in enumerate(speed_labels):
-            bx = px + i * (bw + 4)
-            speed_btns.append(Button(
-                pygame.Rect(bx, sy, bw, 26),
-                text=s_lbl,
-                font=fonts["small"]
-            ))
-        self.speed_group = ButtonGroup(speed_btns, initial_index=1, on_change=self._handle_speed_change)
+        # 3. Speed slider (1 to 50 simulated minutes per real second)
+        self.speed_slider = Slider(
+            pygame.Rect(px, panel.y + 124, pw, 20),
+            min_val=1.0,
+            max_val=50.0,
+            initial_val=1.0,
+            font=fonts["small"],
+            label="Speed",
+            unit=" min/s",
+            integer_only=True,
+            on_change=on_speed_change
+        )
         self.on_speed_change = on_speed_change
 
         # 4. Policy selector: [ Always-On | Threshold | Scheduled | Sleep-Buffer ]
         policy_labels = ["Always-On", "Threshold", "Scheduled", "Sleep-Buffer"]
         policy_btns = []
-        py_start = panel.y + 186
+        py_start = panel.y + 192
         for i, p_lbl in enumerate(policy_labels):
             col = i % 2
             row = i // 2
@@ -86,7 +84,7 @@ class ControlsView:
 
         # 5. Workload triggers
         self.diurnal_switch = ToggleSwitch(
-            pygame.Rect(px, panel.y + 276, pw, 26),
+            pygame.Rect(px, panel.y + 280, pw, 26),
             label="Diurnal Auto-Cycle",
             font=fonts["normal"],
             initial_state=True,
@@ -94,14 +92,14 @@ class ControlsView:
         )
 
         self.abrupt_drop_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 312, 54, 24),
+            pygame.Rect(panel.right - 70, panel.y + 320, 54, 24),
             text="[ btn ]",
             font=fonts["small"],
             callback=on_abrupt_drop
         )
 
         self.flash_crowd_btn = Button(
-            pygame.Rect(panel.right - 70, panel.y + 344, 54, 24),
+            pygame.Rect(panel.right - 70, panel.y + 356, 54, 24),
             text="[ btn ]",
             font=fonts["small"],
             callback=on_flash_crowd,
@@ -112,32 +110,21 @@ class ControlsView:
 
         # 6. Traffic volume slider
         self.traffic_slider = Slider(
-            pygame.Rect(px, panel.y + 406, pw, 20),
+            pygame.Rect(px, panel.y + 422, pw, 20),
             min_val=0.2,
             max_val=3.0,
             initial_val=1.0,
             font=fonts["small"],
             label="Traffic volume",
+            unit="x",
+            integer_only=False,
             on_change=on_traffic_volume
-        )
-
-        # 7. [ ⚙ Settings ] button
-        self.settings_btn = Button(
-            pygame.Rect(px, panel.y + 452, pw, 28),
-            text="⚙ Hardware & Cost Settings",
-            font=fonts["normal"],
-            callback=on_open_settings
         )
 
     def _toggle_play_pause(self):
         self.is_paused = not self.is_paused
         self.play_pause_btn.text = "> Resume" if self.is_paused else "|| Pause"
         self.on_play_pause(self.is_paused)
-
-    def _handle_speed_change(self, index: int, text: str):
-        speed_map = {"1x": 1.0, "5x": 5.0, "20x": 20.0, "50x": 50.0}
-        mult = speed_map.get(text, 5.0)
-        self.on_speed_change(mult)
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         if not self.layout.show_controls:
@@ -147,7 +134,7 @@ class ControlsView:
             return True
         if self.play_pause_btn.handle_event(event):
             return True
-        if self.speed_group.handle_event(event):
+        if self.speed_slider.handle_event(event):
             return True
         if self.policy_group.handle_event(event):
             return True
@@ -158,8 +145,6 @@ class ControlsView:
         if self.flash_crowd_btn.handle_event(event):
             return True
         if self.traffic_slider.handle_event(event):
-            return True
-        if self.settings_btn.handle_event(event):
             return True
         return False
 
@@ -182,26 +167,25 @@ class ControlsView:
 
         self.play_pause_btn.draw(surface)
 
-        speed_lbl = self.fonts["normal"].render("Speed:", True, (160, 165, 175))
-        surface.blit(speed_lbl, (panel.x + 16, panel.y + 102))
-        self.speed_group.draw(surface)
+        # Speed Slider
+        self.speed_slider.draw(surface)
 
+        # Policy Section Header
         policy_lbl = self.fonts["normal"].render("Policy:", True, (160, 165, 175))
-        surface.blit(policy_lbl, (panel.x + 16, panel.y + 162))
+        surface.blit(policy_lbl, (panel.x + 16, panel.y + 168))
         self.policy_group.draw(surface)
 
         self.diurnal_switch.draw(surface)
 
         drop_lbl = self.fonts["normal"].render("Abrupt Traffic Drop", True, (210, 215, 225))
-        surface.blit(drop_lbl, (panel.x + 16, panel.y + 314))
+        surface.blit(drop_lbl, (panel.x + 16, panel.y + 322))
         self.abrupt_drop_btn.draw(surface)
 
         flash_lbl = self.fonts["normal"].render("Flash Crowd", True, (210, 215, 225))
-        surface.blit(flash_lbl, (panel.x + 16, panel.y + 346))
+        surface.blit(flash_lbl, (panel.x + 16, panel.y + 358))
         self.flash_crowd_btn.draw(surface)
 
         self.traffic_slider.draw(surface)
-        self.settings_btn.draw(surface)
 
         self._draw_clock(surface, sim_time_seconds)
 
