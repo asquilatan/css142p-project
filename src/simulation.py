@@ -158,6 +158,7 @@ class SimulationEngine:
                 break
 
             req = self.request_queue.popleft()
+            chosen_server.reserve_slot()
             self.env.process(self._execute_request(chosen_server, req))
 
         self.metrics.current_queue_depth = len(self.request_queue)
