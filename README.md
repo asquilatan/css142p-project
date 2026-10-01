@@ -2,6 +2,8 @@
 
 A Discrete-Event Simulation (DES) modeling server provisioning policies, cold-boot penalties, and energy costs under diurnal and flash-crowd traffic surges.
 
+![Interactive Control Room](assets/demo1.png)
+
 ## Overview
 Large-scale data center operators face direct financial trade-offs between electricity costs and request handling performance:
 - **Idle servers** consume 50% to 70% of their peak power draw.
@@ -13,12 +15,22 @@ This project implements a discrete-event simulation model in Python (leveraging 
 3. **Scheduled Provisioning**: Predictive scaling pre-warming nodes ahead of diurnal peak hours.
 4. **Sleep-Buffer**: Low-power ACPI sleep standby tier offering rapid sub-second wake times.
 
+## Telemetry & Waveform Analytics
+The simulation includes a dedicated secondary multi-waveform telemetry dashboard tracking real-time queue depth, provisioned facility power draw, arrival demand rates, and cumulative financial costs (electricity tariffs plus SLA violation penalties):
+
+![Telemetry & Waveform Analytics](assets/demo2.png)
+
 ## System Requirements
-- Python 3.14+
-- Dependencies listed in `requirements.txt`:
+- **Python**: Python 3.10+ (tested on Python 3.14)
+- **Dependencies**:
   ```bash
   pip install -r requirements.txt
   ```
+- **Rust (Recommended)**: Installing Rust (`cargo`) is strongly recommended for optimal simulation performance:
+  ```bash
+  cargo build --release --manifest-path crates/sim_core/Cargo.toml
+  ```
+  *(If Rust is not installed, the simulator automatically falls back to SimPy.)*
 
 ## Running the Visual Simulation
 Launch the real-time interactive simulation control room:
