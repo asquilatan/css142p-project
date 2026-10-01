@@ -50,14 +50,16 @@ class SimConfig:
     economics: EconomicsConfig = field(default_factory=EconomicsConfig)
     workload: WorkloadConfig = field(default_factory=WorkloadConfig)
 
-    # UI Theme colors (matching clean architectural sketch aesthetic)
-    bg_color: tuple = (250, 250, 252)
-    border_color: tuple = (20, 20, 25)
-    text_color: tuple = (25, 25, 30)
-    text_muted: tuple = (110, 115, 125)
-    accent_blue: tuple = (41, 128, 185)
-    accent_green: tuple = (46, 204, 113)
-    accent_orange: tuple = (230, 126, 34)
-    accent_red: tuple = (231, 76, 60)
-    accent_purple: tuple = (155, 89, 182)
-    panel_bg: tuple = (255, 255, 255)
+    # Minimalist Dark Theme Palette (#212121)
+    bg_color: tuple = (33, 33, 33)           # #212121 canvas background
+    panel_bg: tuple = (24, 24, 26)           # #18181A docked side columns
+    card_bg: tuple = (38, 38, 42)            # #26262A cards and buttons
+    card_hover: tuple = (50, 50, 56)         # #323238 button hover
+    border_color: tuple = (48, 48, 54)       # #303036 subtle 1px dividers
+    text_color: tuple = (230, 230, 235)      # Primary crisp text
+    text_muted: tuple = (150, 150, 160)      # Secondary muted labels
+    accent_blue: tuple = (138, 180, 248)     # Soft blue
+    accent_green: tuple = (129, 201, 149)    # Emerald active green
+    accent_orange: tuple = (253, 214, 99)    # Amber warm boot
+    accent_red: tuple = (242, 139, 130)      # Pastel red drop/surge
+    accent_purple: tuple = (197, 138, 249)   # Standby sleep purple
