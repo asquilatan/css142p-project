@@ -1,7 +1,7 @@
 """
 Asset Manager.
 Loads custom PNG sprites from assets/ with automatic procedural
-2D vector fallback rendering matching the architectural sketch aesthetic.
+2D vector fallback rendering matching the minimal dark aesthetic.
 """
 
 import os
@@ -42,7 +42,7 @@ class AssetsManager:
             self.images[key] = self._create_procedural_fallback(key)
 
     def _create_procedural_fallback(self, key: str) -> pygame.Surface:
-        """Procedurally draws vector components matching the architectural sketch."""
+        """Procedurally draws vector components matching the minimal dark aesthetic."""
         if key.startswith("server_"):
             return self._draw_server_fallback(key)
         elif key == "load_balancer":
@@ -53,83 +53,87 @@ class AssetsManager:
             return self._draw_packet_fallback()
 
         surf = pygame.Surface((64, 64), pygame.SRCALPHA)
-        surf.fill((200, 200, 200))
+        surf.fill((40, 40, 45))
         return surf
 
     def _draw_server_fallback(self, key: str) -> pygame.Surface:
-        w, h = 100, 70
+        w, h = 110, 68
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
 
-        # Base chassis rectangle
-        bg_color = (245, 245, 248)
-        border_color = (25, 25, 30)
-        pygame.draw.rect(surf, bg_color, (2, 2, w - 4, h - 4), border_radius=4)
-        pygame.draw.rect(surf, border_color, (2, 2, w - 4, h - 4), width=2, border_radius=4)
+        # Base chassis card in dark mode
+        card_bg = (38, 38, 44)
+        border_color = (60, 60, 70)
+        pygame.draw.rect(surf, card_bg, (1, 1, w - 2, h - 2), border_radius=6)
+        pygame.draw.rect(surf, border_color, (1, 1, w - 2, h - 2), width=1, border_radius=6)
 
-        # Grill lines
-        for y in range(16, h - 16, 8):
-            pygame.draw.line(surf, (210, 215, 225), (12, y), (w - 32, y), 1)
-
-        # Status LED indicator
+        # Status LED indicator (glowing dot)
         led_color = {
-            "server_active": (46, 204, 113),  # Vivid Green
-            "server_idle": (52, 152, 219),    # Blue
-            "server_boot": (243, 156, 18),    # Amber
-            "server_sleep": (155, 89, 182),   # Purple
-            "server_off": (149, 165, 166),    # Gray
-        }.get(key, (149, 165, 166))
+            "server_active": (129, 201, 149), # Soft Emerald Green
+            "server_idle": (138, 180, 248),   # Soft Blue
+            "server_boot": (253, 214, 99),    # Amber
+            "server_sleep": (197, 138, 249),  # Lavender Purple
+            "server_off": (100, 100, 110),    # Slate Gray
+        }.get(key, (100, 100, 110))
 
-        pygame.draw.circle(surf, led_color, (w - 18, 18), 5)
-        pygame.draw.circle(surf, border_color, (w - 18, 18), 5, 1)
+
+        # LED halo glow and core
+        pygame.draw.circle(surf, (*led_color, 60), (w - 18, 18), 7)
+        pygame.draw.circle(surf, led_color, (w - 18, 18), 4)
+
+        # Minimal grill slot accent
+        for y in range(40, 52, 5):
+            pygame.draw.line(surf, (50, 50, 60), (14, y), (w - 32, y), 1)
 
         return surf
 
     def _draw_load_balancer_fallback(self) -> pygame.Surface:
-        w, h = 60, 110
+        w, h = 64, 110
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
-        pygame.draw.rect(surf, (240, 242, 245), (2, 2, w - 4, h - 4), border_radius=4)
-        pygame.draw.rect(surf, (25, 25, 30), (2, 2, w - 4, h - 4), width=2, border_radius=4)
+        pygame.draw.rect(surf, (36, 36, 42), (1, 1, w - 2, h - 2), border_radius=6)
+        pygame.draw.rect(surf, (60, 60, 70), (1, 1, w - 2, h - 2), width=1, border_radius=6)
 
-        # Internal distributor circles and routing arrows
+        # Router distribution nodes
         cx = w // 2
-        nodes = [(cx, 30), (cx, 55), (cx, 80)]
+        nodes = [(cx, 28), (cx, 55), (cx, 82)]
         for nx, ny in nodes:
-            pygame.draw.circle(surf, (100, 110, 130), (nx, ny), 6)
-            pygame.draw.circle(surf, (25, 25, 30), (nx, ny), 6, 1)
+            pygame.draw.circle(surf, (138, 180, 248), (nx, ny), 5)
+            pygame.draw.circle(surf, (20, 20, 25), (nx, ny), 5, 1)
 
-        # Connecting routing arrows
-        pygame.draw.line(surf, (50, 50, 60), (cx, 36), (cx, 49), 2)
-        pygame.draw.line(surf, (50, 50, 60), (cx, 61), (cx, 74), 2)
+        # Connecting link line
+        pygame.draw.line(surf, (70, 80, 100), (cx, 33), (cx, 50), 2)
+        pygame.draw.line(surf, (70, 80, 100), (cx, 60), (cx, 77), 2)
 
         return surf
 
     def _draw_cloud_fallback(self) -> pygame.Surface:
-        w, h = 80, 50
+        w, h = 84, 52
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
-        # Cloud puffs
+        cloud_color = (40, 44, 52)
+        border_color = (80, 90, 110)
+
         puffs = [
-            (28, 28, 16),
-            (44, 22, 18),
-            (56, 30, 14),
-            (38, 34, 15),
-            (24, 34, 12),
+            (30, 30, 16),
+            (46, 24, 18),
+            (60, 32, 14),
+            (42, 36, 15),
+            (26, 36, 12),
         ]
         for px, py, r in puffs:
-            pygame.draw.circle(surf, (215, 228, 240), (px, py), r)
+            pygame.draw.circle(surf, cloud_color, (px, py), r)
         for px, py, r in puffs:
-            pygame.draw.circle(surf, (25, 25, 30), (px, py), r, 2)
+            pygame.draw.circle(surf, border_color, (px, py), r, 1)
         return surf
 
     def _draw_packet_fallback(self) -> pygame.Surface:
-        w, h = 20, 24
+        w, h = 18, 22
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
-        # Document sheet icon
-        pygame.draw.rect(surf, (255, 255, 255), (2, 2, w - 4, h - 4), border_radius=2)
-        pygame.draw.rect(surf, (30, 30, 40), (2, 2, w - 4, h - 4), width=1, border_radius=2)
-        # Text lines
-        pygame.draw.line(surf, (120, 130, 145), (5, 7), (w - 5, 7), 1)
-        pygame.draw.line(surf, (120, 130, 145), (5, 11), (w - 5, 11), 1)
-        pygame.draw.line(surf, (120, 130, 145), (5, 15), (w - 8, 15), 1)
+        # Minimalist glowing packet card
+        pygame.draw.rect(surf, (50, 55, 68), (1, 1, w - 2, h - 2), border_radius=3)
+        pygame.draw.rect(surf, (138, 180, 248), (1, 1, w - 2, h - 2), width=1, border_radius=3)
+        # Data accent bars
+        pygame.draw.line(surf, (138, 180, 248), (4, 6), (w - 4, 6), 1)
+        pygame.draw.line(surf, (100, 115, 140), (4, 10), (w - 4, 10), 1)
+        pygame.draw.line(surf, (100, 115, 140), (4, 14), (w - 7, 14), 1)
         return surf
 
     def get_server_surface(self, state: ServerState) -> pygame.Surface:
