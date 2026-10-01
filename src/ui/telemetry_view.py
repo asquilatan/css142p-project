@@ -71,13 +71,27 @@ class TelemetryView:
                 }.get(srv.state, (90, 90, 100))
 
                 dot_cy = y_offset + 9
-                pygame.draw.circle(surface, dot_color, (racks_rect.x + 22, dot_cy), 4)
+                pygame.draw.circle(surface, dot_color, (racks_rect.x + 18, dot_cy), 4)
 
                 name_surf = self.fonts["normal"].render(node_name, True, (215, 215, 225))
-                surface.blit(name_surf, (racks_rect.x + 34, y_offset))
+                surface.blit(name_surf, (racks_rect.x + 28, y_offset))
+
+                # Display load per server
+                if srv.state in (ServerState.ACTIVE, ServerState.IDLE):
+                    load_text = f"{srv.active_request_count}/{srv.capacity}"
+                    load_col = (129, 201, 149) if srv.active_request_count > 0 else (140, 145, 155)
+                elif srv.state in (ServerState.BOOTING, ServerState.WAKING):
+                    load_text = f"{int(srv.get_boot_progress_pct() * 100)}%"
+                    load_col = (253, 214, 99)
+                else:
+                    load_text = "-"
+                    load_col = (90, 95, 105)
+
+                load_surf = self.fonts["mono"].render(load_text, True, load_col)
+                surface.blit(load_surf, (racks_rect.x + 102, y_offset + 1))
 
                 badge_surf = self.fonts["mono"].render(state_text, True, (160, 165, 175))
-                surface.blit(badge_surf, (racks_rect.right - badge_surf.get_width() - 18, y_offset))
+                surface.blit(badge_surf, (racks_rect.right - badge_surf.get_width() - 14, y_offset))
 
                 y_offset += 24
                 if y_offset > racks_rect.bottom - 22:
