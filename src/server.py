@@ -37,6 +37,8 @@ class Server:
         # Energy tracking (Numerical integration of Power x Time)
         self.last_energy_update_time = self.env.now
         self.energy_joules_consumed = 0.0
+        self.power_per_slot = (self.hw.peak_power_watts - self.hw.idle_power_watts) / max(1, self.capacity)
+        self.current_power_watts = self.hw.idle_power_watts
 
         # SimPy Resource representing server concurrency slots
         self.resource = simpy.Resource(env, capacity=self.capacity)
@@ -53,29 +55,14 @@ class Server:
 
     def get_instantaneous_power_watts(self) -> float:
         """Returns the current continuous power draw in Watts based on hardware state."""
-        if self.state == ServerState.OFF:
-            return self.hw.off_power_watts
-        elif self.state in (ServerState.BOOTING, ServerState.WAKING):
-            return self.hw.boot_power_watts
-        elif self.state == ServerState.SLEEPING:
-            return self.hw.sleep_power_watts
-        elif self.state == ServerState.IDLE:
-            return self.hw.idle_power_watts
-        elif self.state == ServerState.ACTIVE:
-            # Proportional power scaling: P_idle + (P_peak - P_idle) * (load / capacity)
-            load_fraction = min(1.0, self.active_request_count / max(1, self.capacity))
-            power_span = self.hw.peak_power_watts - self.hw.idle_power_watts
-            return self.hw.idle_power_watts + (power_span * load_fraction)
-        return self.hw.idle_power_watts
+        return self.current_power_watts
 
     def _update_energy(self):
         """Integrates energy consumption between the last recorded event and current sim time."""
         now = self.env.now
         delta_seconds = now - self.last_energy_update_time
         if delta_seconds > 0:
-            current_watts = self.get_instantaneous_power_watts()
-            # Joules = Watts * Seconds
-            self.energy_joules_consumed += current_watts * delta_seconds
+            self.energy_joules_consumed += self.current_power_watts * delta_seconds
             self.last_energy_update_time = now
 
     def get_boot_progress_pct(self) -> float:
@@ -101,6 +88,7 @@ class Server:
         if self.state in (ServerState.IDLE, ServerState.ACTIVE, ServerState.BOOTING):
             return
         self.state = ServerState.BOOTING
+        self.current_power_watts = self.hw.boot_power_watts
         self.transition_start_time = self.env.now
         self.transition_target_duration = self.hw.cold_boot_delay_sec
         self.current_process = self.env.process(self._boot_process())
@@ -110,10 +98,12 @@ class Server:
             yield self.env.timeout(self.hw.cold_boot_delay_sec)
             self._update_energy()
             self.state = ServerState.IDLE
+            self.current_power_watts = self.hw.idle_power_watts
             self.current_process = None
         except simpy.Interrupt:
             self._update_energy()
             self.state = ServerState.OFF
+            self.current_power_watts = self.hw.off_power_watts
 
     def wake(self):
         """Initiate fast wake sequence from SLEEPING to IDLE."""
@@ -121,6 +111,7 @@ class Server:
         if self.state in (ServerState.IDLE, ServerState.ACTIVE, ServerState.WAKING):
             return
         self.state = ServerState.WAKING
+        self.current_power_watts = self.hw.boot_power_watts
         self.transition_start_time = self.env.now
         self.transition_target_duration = self.hw.sleep_wake_delay_sec
         self.current_process = self.env.process(self._wake_process())
@@ -130,10 +121,12 @@ class Server:
             yield self.env.timeout(self.hw.sleep_wake_delay_sec)
             self._update_energy()
             self.state = ServerState.IDLE
+            self.current_power_watts = self.hw.idle_power_watts
             self.current_process = None
         except simpy.Interrupt:
             self._update_energy()
             self.state = ServerState.SLEEPING
+            self.current_power_watts = self.hw.sleep_power_watts
 
     def sleep(self):
         """Put server into low-power ACPI standby sleep."""
@@ -143,6 +136,7 @@ class Server:
         if self.current_process and self.current_process.is_alive:
             self.current_process.interrupt()
         self.state = ServerState.SLEEPING
+        self.current_power_watts = self.hw.sleep_power_watts
 
     def power_off(self):
         """Completely power off the server node."""
@@ -152,6 +146,7 @@ class Server:
         if self.current_process and self.current_process.is_alive:
             self.current_process.interrupt()
         self.state = ServerState.OFF
+        self.current_power_watts = self.hw.off_power_watts
 
     # -------------------------------------------------------------------------
     # Request Execution
@@ -165,19 +160,29 @@ class Server:
 
     def reserve_slot(self):
         """Synchronously reserves a processing slot at dispatch time."""
-        if self.env.now != self.last_energy_update_time:
-            self._update_energy()
+        now = self.env.now
+        dt = now - self.last_energy_update_time
+        if dt > 0:
+            self.energy_joules_consumed += self.current_power_watts * dt
+            self.last_energy_update_time = now
         self.active_request_count += 1
         self.state = ServerState.ACTIVE
+        self.current_power_watts = self.hw.idle_power_watts + self.power_per_slot * min(self.active_request_count, self.capacity)
 
     def release_slot(self):
         """Releases a processing slot upon request completion."""
-        if self.env.now != self.last_energy_update_time:
-            self._update_energy()
+        now = self.env.now
+        dt = now - self.last_energy_update_time
+        if dt > 0:
+            self.energy_joules_consumed += self.current_power_watts * dt
+            self.last_energy_update_time = now
         self.active_request_count = max(0, self.active_request_count - 1)
         self.total_served_count += 1
         if self.active_request_count == 0:
             self.state = ServerState.IDLE
+            self.current_power_watts = self.hw.idle_power_watts
+        else:
+            self.current_power_watts = self.hw.idle_power_watts + self.power_per_slot * self.active_request_count
 
     def serve_request(self, service_time: float):
         """SimPy process that executes a request on this server node."""
