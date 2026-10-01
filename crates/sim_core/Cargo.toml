@@ -1,0 +1,13 @@
+[package]
+name = "sim_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sim_core"
+crate-type = ["cdylib", "rlib"]
+
+# NOTE: intentionally zero dependencies — the accelerator must build with
+# plain `cargo build --release` on any machine (including offline academic
+# lab PCs) using only the Rust standard library.
+[dependencies]
