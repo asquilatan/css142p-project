@@ -58,15 +58,6 @@ class MetricsCollector:
         self.history_arrival_rate.append(arrival_rate)
         self.history_dropped_rate.append(float(self.total_requests_dropped))
 
-        # Memory & performance protection for massive multi-day/month simulations:
-        # Keep maximum ~4,000 points across the full timeline by decimating by 2 when exceeding limit
-        if len(self.history_timestamps) >= 4000:
-            self.history_timestamps = self.history_timestamps[::2]
-            self.history_queue_depth = self.history_queue_depth[::2]
-            self.history_power_watts = self.history_power_watts[::2]
-            self.history_arrival_rate = self.history_arrival_rate[::2]
-            self.history_dropped_rate = self.history_dropped_rate[::2]
-
     def reset(self):
         """Clear all metrics counters and historical telemetry."""
         self.total_requests_arrived = 0
