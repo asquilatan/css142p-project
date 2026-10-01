@@ -27,15 +27,15 @@ class MetricsCollector:
         self.facility_cumulative_energy_kwh = 0.0
         self.estimated_cost_php = 0.0
 
-        # Rolling time-series for live Picture-in-Picture graphs
-        self.history_timestamps = deque(maxlen=history_max_len)
-        self.history_queue_depth = deque(maxlen=history_max_len)
-        self.history_power_watts = deque(maxlen=history_max_len)
-        self.history_arrival_rate = deque(maxlen=history_max_len)
-        self.history_dropped_rate = deque(maxlen=history_max_len)
+        # Historical time-series spanning the entire simulation
+        self.history_timestamps: List[float] = []
+        self.history_queue_depth: List[float] = []
+        self.history_power_watts: List[float] = []
+        self.history_arrival_rate: List[float] = []
+        self.history_dropped_rate: List[float] = []
 
     def record_sample(self, sim_time_sec: float, servers: list, arrival_rate: float):
-        """Called periodically (e.g. every simulated 0.5s or 1s) to record rolling telemetry."""
+        """Called periodically (e.g. every simulated 1s) to record full-simulation telemetry."""
         # Calculate instantaneous server power
         server_watts = sum(s.get_instantaneous_power_watts() for s in servers)
         self.instant_power_watts = server_watts
@@ -51,15 +51,24 @@ class MetricsCollector:
         sla_penalty_cost = self.total_requests_dropped * self.config.economics.cost_per_dropped_req_php
         self.estimated_cost_php = electricity_cost + sla_penalty_cost
 
-        # Append to rolling history deque
+        # Append to full simulation history
         self.history_timestamps.append(sim_time_sec)
-        self.history_queue_depth.append(self.current_queue_depth)
+        self.history_queue_depth.append(float(self.current_queue_depth))
         self.history_power_watts.append(self.facility_instant_power_watts)
         self.history_arrival_rate.append(arrival_rate)
-        self.history_dropped_rate.append(self.total_requests_dropped)
+        self.history_dropped_rate.append(float(self.total_requests_dropped))
+
+        # Memory & performance protection for massive multi-day/month simulations:
+        # Keep maximum ~4,000 points across the full timeline by decimating by 2 when exceeding limit
+        if len(self.history_timestamps) >= 4000:
+            self.history_timestamps = self.history_timestamps[::2]
+            self.history_queue_depth = self.history_queue_depth[::2]
+            self.history_power_watts = self.history_power_watts[::2]
+            self.history_arrival_rate = self.history_arrival_rate[::2]
+            self.history_dropped_rate = self.history_dropped_rate[::2]
 
     def reset(self):
-        """Clear all metrics counters and rolling histories."""
+        """Clear all metrics counters and historical telemetry."""
         self.total_requests_arrived = 0
         self.total_requests_served = 0
         self.total_requests_dropped = 0
