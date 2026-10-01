@@ -242,6 +242,11 @@ def main():
                     on_reset()
                 elif event.key == pygame.K_g:
                     graphs_view.toggle_visible()
+                elif event.key in (pygame.K_x, pygame.K_ESCAPE):
+                    if graphs_view.is_visible:
+                        graphs_view.set_visible(False)
+                    elif settings_modal.is_open:
+                        settings_modal.close()
 
         # ---------------------------------------------------------------------
         # 2. Discrete-Event Simulation Step (SimPy + Delta Time)
