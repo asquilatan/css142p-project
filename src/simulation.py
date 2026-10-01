@@ -12,6 +12,7 @@ from src.config import SimConfig
 from src.server import Server, ServerState
 from src.workload import WorkloadGenerator
 from src.metrics import MetricsCollector
+from src.policies.base import ProvisioningPolicy
 
 
 @dataclass
@@ -45,12 +46,16 @@ class SimulationEngine:
         self.servers: List[Server] = []
         self._init_servers(config.num_servers)
 
-        # Incoming request queue
+        # Incoming request queue (stores arrival timestamps as plain floats:
+        # service time is a config constant and no policy inspects request payloads,
+        # so per-request dicts would be pure allocation overhead).
         self.request_queue: deque = deque()
-        self.next_request_id = 1
 
         # Provisioning Policy (set externally)
         self.policy = None
+        # Cached hook: None when the policy uses the base no-op on_arrival,
+        # avoiding one method dispatch per arrival in the common case.
+        self._on_arrival_hook = None
 
         # Round-robin load balancer index pointer
         self.lb_round_robin_idx: int = 0
@@ -90,6 +95,10 @@ class SimulationEngine:
         """Attaches a provisioning policy."""
         self.policy = policy
         self.policy.attach(self)
+        if type(policy).on_arrival is ProvisioningPolicy.on_arrival:
+            self._on_arrival_hook = None
+        else:
+            self._on_arrival_hook = policy.on_arrival
 
     # -------------------------------------------------------------------------
     # SimPy Processes & Dispatch
@@ -108,30 +117,30 @@ class SimulationEngine:
                 return srv
         return None
 
-    def _start_serving(self, server: Server, req: dict):
+    def _start_serving(self, server: Server, arrival_time: float):
         """Starts request execution on server via direct SimPy event callback without Process overhead."""
         server.reserve_slot()
-        evt = self.env.timeout(req["service_time"])
-        evt.callbacks.append(lambda _evt, s=server, r=req: self._on_request_completed(s, r))
+        evt = self.env.timeout(self.config.workload.mean_service_time_sec)
+        evt.callbacks.append(lambda _evt, s=server, t=arrival_time: self._on_request_completed(s, t))
 
-    def _on_request_completed(self, server: Server, req: dict):
+    def _on_request_completed(self, server: Server, arrival_time: float):
         """Handles request completion, invokes policy hook, and performs O(1) handoff to queued requests."""
         server.release_slot()
         self.metrics.total_requests_served += 1
         if self.policy:
-            self.policy.on_completion(server, req)
+            self.policy.on_completion(server, arrival_time)
 
         # Clean expired requests from front of queue (SLA Timeout Drop)
         now = self.env.now
         timeout_limit = self.config.workload.request_timeout_sec
-        while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
+        while self.request_queue and (now - self.request_queue[0]) > timeout_limit:
             self.request_queue.popleft()
             self.metrics.total_requests_dropped += 1
 
         # Direct O(1) server handoff: server that just freed a slot takes next item
         if self.request_queue and server.can_accept_request():
-            next_req = self.request_queue.popleft()
-            self._start_serving(server, next_req)
+            next_arrival = self.request_queue.popleft()
+            self._start_serving(server, next_arrival)
 
         self.metrics.current_queue_depth = len(self.request_queue)
 
@@ -148,25 +157,20 @@ class SimulationEngine:
                 self.metrics.total_requests_dropped += 1
                 continue
 
-            req = {
-                "id": self.next_request_id,
-                "arrival_time": self.env.now,
-                "service_time": self.config.workload.mean_service_time_sec
-            }
-            self.next_request_id += 1
+            req_arrival = self.env.now
 
-            if self.policy:
-                self.policy.on_arrival(req)
+            if self._on_arrival_hook is not None:
+                self._on_arrival_hook(req_arrival)
 
             # If queue is empty, attempt immediate round-robin dispatch to a ready server
             if not self.request_queue:
                 chosen_server = self._find_ready_server()
                 if chosen_server is not None:
-                    self._start_serving(chosen_server, req)
+                    self._start_serving(chosen_server, req_arrival)
                     continue
 
             # Otherwise (or if all servers busy), append to queue
-            self.request_queue.append(req)
+            self.request_queue.append(req_arrival)
             self.metrics.current_queue_depth = len(self.request_queue)
 
     def _try_dispatch(self):
@@ -179,7 +183,7 @@ class SimulationEngine:
         timeout_limit = self.config.workload.request_timeout_sec
 
         # Clean expired requests from front of queue (SLA Timeout Drop)
-        while self.request_queue and (now - self.request_queue[0]["arrival_time"]) > timeout_limit:
+        while self.request_queue and (now - self.request_queue[0]) > timeout_limit:
             self.request_queue.popleft()
             self.metrics.total_requests_dropped += 1
 

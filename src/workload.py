@@ -5,18 +5,32 @@ sudden flash crowd surges, and abrupt traffic drops.
 """
 
 import math
-import random
+import numpy as np
 from src.config import WorkloadConfig
 
 
 class WorkloadGenerator:
-    def __init__(self, config: WorkloadConfig):
+    def __init__(self, config: WorkloadConfig, rng_chunk: int = 4096):
         self.config = config
         self.flash_crowd_active = False
         self.flash_crowd_start_time = 0.0
         self.flash_crowd_duration = 300.0  # 5-minute surge by default
         self.traffic_scale_factor = 1.0     # Controlled by the UI slider (0.2x to 3.0x)
         self.abrupt_drop_active = False
+        # Pre-generated unit-rate exponentials: drawing per-arrival Python
+        # random.expovariate() costs a full call chain each time, while one
+        # vectorized NumPy fill amortizes RNG overhead over `rng_chunk` arrivals.
+        # Dividing a unit exponential by the current rate is distributionally
+        # identical to expovariate(rate).
+        self._rng_chunk = max(64, int(rng_chunk))
+        self._exp_buf = np.empty(0, dtype=np.float64)
+        self._exp_idx = 0
+        # Diurnal wave cache: the sinusoid is re-evaluated at most once per
+        # simulated second (negligible staleness vs. Poisson noise). All
+        # surge/drop/diurnal flags are still evaluated fresh on every call,
+        # so trigger behavior stays exact.
+        self._wave_bucket: int = -1
+        self._wave_value: float = 0.0
 
     def trigger_flash_crowd(self, current_time: float, duration: float = 300.0):
         """Inject a sudden flash crowd surge."""
@@ -35,6 +49,28 @@ class WorkloadGenerator:
         self.flash_crowd_active = False
         self.abrupt_drop_active = False
 
+    def _diurnal_wave(self, sim_time_seconds: float) -> float:
+        """Normalized 0.0-1.0 diurnal wave, cached per simulated second."""
+        bucket = int(sim_time_seconds)
+        if bucket != self._wave_bucket:
+            # 24-hour cycle = 86,400 seconds. Trough at 03:00 (10800s), Peak at 15:00 (54000s)
+            day_seconds = float(bucket % 86400)
+            # Phase shift so trough is near 3 AM (0.125 of day) and peak near 3 PM (0.625 of day)
+            radians = (2.0 * math.pi * (day_seconds - 10800.0)) / 86400.0
+            # Normalized wave from 0.0 to 1.0
+            self._wave_value = (math.sin(radians - math.pi / 2.0) + 1.0) / 2.0
+            self._wave_bucket = bucket
+        return self._wave_value
+
+    def _unit_exponential(self) -> float:
+        """Draws a unit-rate exponential, refilling the vectorized buffer as needed."""
+        if self._exp_idx >= self._exp_buf.shape[0]:
+            self._exp_buf = np.random.exponential(scale=1.0, size=self._rng_chunk)
+            self._exp_idx = 0
+        value = float(self._exp_buf[self._exp_idx])
+        self._exp_idx += 1
+        return value
+
     def get_current_arrival_rate(self, sim_time_seconds: float) -> float:
         """
         Calculates the instantaneous expected Poisson arrival rate (requests/sec)
@@ -51,12 +87,7 @@ class WorkloadGenerator:
         if not self.config.diurnal_cycle_active:
             base_rate = (self.config.base_arrival_rate + self.config.peak_arrival_rate) / 2.0
         else:
-            # 24-hour cycle = 86,400 seconds. Trough at 03:00 (10800s), Peak at 15:00 (54000s)
-            day_seconds = sim_time_seconds % 86400.0
-            # Phase shift so trough is near 3 AM (0.125 of day) and peak near 3 PM (0.625 of day)
-            radians = (2.0 * math.pi * (day_seconds - 10800.0)) / 86400.0
-            # Normalized wave from 0.0 to 1.0
-            wave = (math.sin(radians - math.pi / 2.0) + 1.0) / 2.0
+            wave = self._diurnal_wave(sim_time_seconds)
             rate_span = self.config.peak_arrival_rate - self.config.base_arrival_rate
             base_rate = self.config.base_arrival_rate + (rate_span * wave)
 
@@ -70,4 +101,4 @@ class WorkloadGenerator:
     def get_next_interarrival_time(self, sim_time_seconds: float) -> float:
         """Draws the next inter-arrival interval using an exponential distribution."""
         rate = self.get_current_arrival_rate(sim_time_seconds)
-        return random.expovariate(rate)
+        return self._unit_exponential() / rate

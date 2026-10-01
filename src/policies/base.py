@@ -23,10 +23,10 @@ class ProvisioningPolicy(ABC):
         """Called periodically by the simulation engine event loop."""
         pass
 
-    def on_arrival(self, req: dict):
-        """Called when a new request enters the queue."""
+    def on_arrival(self, arrival_time: float):
+        """Called when a new request enters the queue (receives its arrival timestamp)."""
         pass
 
-    def on_completion(self, server, req: dict):
+    def on_completion(self, server, arrival_time: float):
         """Called when a request finishes processing on a server."""
         pass
