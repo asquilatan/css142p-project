@@ -38,6 +38,13 @@ Launch the real-time interactive simulation control room:
 python main.py
 ```
 
+## Running the Test Suite
+Execute the automated test suite across all subsystems:
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+The suite runs 22 tests (22/22 passing) which shows server state machines, power integration, diurnal and surge workload generation, provisioning policy logic, request conservation, and Python-Rust backend parity.
+
 ## Hardware & Power Model
 - **Active Power**: $300\text{ W}$ (serving requests)
 - **Idle Power**: $150\text{ W}$ (ready with zero active requests)
